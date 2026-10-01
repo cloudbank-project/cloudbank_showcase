@@ -31,12 +31,39 @@ Stand up a hydrology stack on Google Cloud: a GKE Autopilot cluster, JupyterHub 
 
 ## 📖 Documentation Site
 
-All tutorials are also published as a browsable docs site built with [Docusaurus](https://docusaurus.io) (see [website/README.md](website/README.md) for details):
+All tutorials are also published as a browsable docs site built with [Docusaurus](https://docusaurus.io):
+
+**Live:** <https://cloudbank-project.github.io/cloudbank_showcase/>
+
+The site is **generated from the tutorial sources** — the markdown guides stay in their folders (e.g. `gpu_computing_oceanography/`) and are the single source of truth. There is no duplicated content to maintain.
+
+### How it works
+
+- `website/` — the Docusaurus app (config, sidebar, site pages).
+- `website/scripts/sync.mjs` (run automatically before `start`/`build`/`serve`, or manually via `npm run sync`):
+  - copies each tutorial's guides into `website/docs/tutorials/<slug>/` (original filenames kept, so relative links and `img/` assets resolve),
+  - converts every `*.ipynb` notebook to **static markdown** (code cells, text outputs, PNG outputs embedded as images) — no Python/Jupyter needed to build.
+- Generated pages under `website/docs/tutorials/` are git-ignored; never edit them by hand.
+
+### Build and run locally
 
 ```bash
 cd website
 npm install
-npm run build     # generates static site into website/build/
+npm run sync     # (re)generate docs/tutorials from the tutorial sources
+npm run start    # local dev server (http://localhost:3000)
+npm run build    # production build -> website/build/
+npm run serve    # serve the production build locally
 ```
 
-The site is auto-generated **from the tutorial sources** (markdown guides in place, notebooks rendered statically) — no duplicate content to maintain. It is deployed to GitHub Pages by `.github/workflows/docs.yml` on push to `main`.
+### Deploy
+
+`.github/workflows/docs.yml` builds the site and publishes it to GitHub Pages on every push to `main` (source: **GitHub Actions**). The Docusaurus `baseUrl` in `website/docusaurus.config.js` is `/cloudbank_showcase/`; adjust `url`/`baseUrl` there if the site is hosted elsewhere.
+
+### Adding/updating a tutorial
+
+1. Edit the guides/notebooks in their source folder.
+2. Rebuild with `cd website && npm run build` to verify.
+3. When adding a new guide, add it to the `files` list for that tutorial in `website/scripts/sync.mjs`. For a brand-new top-level tutorial, also add a category to `website/sidebars.js` and a row to `website/docs/index.md`.
+
+Full details: [website/README.md](website/README.md).
