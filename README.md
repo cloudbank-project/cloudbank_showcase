@@ -26,3 +26,17 @@ Build a knowledge graph on AWS from scratch: upload the OREGANO dataset to S3, l
 ### Toy Data Portal for Hydrology
 
 Stand up a hydrology stack on Google Cloud: a GKE Autopilot cluster, JupyterHub for notebooks, and a toy data portal for NetCDF uploads and metadata extraction.
+
+---
+
+## 📖 Documentation Site
+
+All tutorials are also published as a browsable docs site built with [Docusaurus](https://docusaurus.io) (see [website/README.md](website/README.md) for details):
+
+```bash
+cd website
+npm install
+npm run build     # generates static site into website/build/
+```
+
+The site is auto-generated **from the tutorial sources** (markdown guides in place, notebooks rendered statically) — no duplicate content to maintain. It is deployed to GitHub Pages by `.github/workflows/docs.yml` on push to `main`.

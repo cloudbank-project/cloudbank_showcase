@@ -21,3 +21,9 @@ knowledge_graphs_chemistry/CloudBank_BioBricks_Showcase_Plan.md
 
 # Other local planning notes
 cloud_analysis_seismology/PLAN.md
+
+# Docusaurus docs site (website/)
+website/node_modules/
+website/build/
+website/.docusaurus/
+website/docs/tutorials/
