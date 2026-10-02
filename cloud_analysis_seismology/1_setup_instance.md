@@ -72,9 +72,9 @@ You can get a terminal in your browser — no SSH client needed:
 > **Prefer SSH from your own laptop?** On Linux/macOS:
 > ```bash
 > chmod 400 your-key.pem
-> ssh -i your-key.pem ec2-user@your-instance-public-dns
+> ssh -i your-key.pem ec2-user@your-instance-public-ip
 > ```
-> Replace `your-key.pem` with your downloaded key file and `your-instance-public-dns` with the *Public IPv4 DNS* shown in the instance details.
+> Replace `your-key.pem` with your downloaded key file and `your-instance-public-ip` with the *Public IPv4 address* shown in the instance details.
 
 ## Install Docker and Jupyter
 
@@ -97,10 +97,10 @@ The instance starts empty. We will run Jupyter Lab inside a Docker container tha
    docker pull ghcr.io/seisscoped/noisepy:centos7_jupyterlab
    ```
 
-3. Create a self-signed certificate so Jupyter can serve HTTPS. Copy the *Public IPv4 DNS* from the EC2 console and use it in the first command:
+3. Create a self-signed certificate so Jupyter can serve HTTPS. In the EC2 console, select your instance and copy its **Public IPv4 address** (shown in the instance details), then use it in the first command:
 
    ```bash
-   export URL="ec2-xxx-x-xxx-xx.us-west-2.compute.amazonaws.com"  # your Public DNS
+   export URL="54.200.100.20"  # your Public IPv4 address
 
    mkdir -p /home/ec2-user/jupyter-cert
    cd /home/ec2-user/jupyter-cert
@@ -109,6 +109,8 @@ The instance starts empty. We will run Jupyter Lab inside a Docker container tha
      -keyout jupyter.key -out jupyter.crt \
      -subj "/CN=${URL}"
    ```
+
+   > Use the **Public IPv4 address**, not the *Private IP*: the certificate must match the address you type in the browser. (Some AWS accounts, including CloudBank's, do not assign a public DNS name to instances — the public IP address works the same way.)
 
 4. Start Jupyter Lab in the container. This maps port 443 of the instance to Jupyter's port 8888 and uses the certificate we just made:
 
@@ -131,6 +133,8 @@ The instance starts empty. We will run Jupyter Lab inside a Docker container tha
    > ```
    > If you skip it, the notebook will ask you to set it before the stacking step (see the note at the end of guide 2).
 
+   > **This terminal is now busy** running the Jupyter container — leave it open. Whenever you need another terminal on the instance (for example in the next guide), simply connect again: EC2 console → **Instances** → select the instance → **Connect** → **Connect**.
+
 ## Open Jupyter Lab
 
 1. In your web browser, go to `https://your-instance-public-ip` (the public address shown in the EC2 console).
@@ -138,6 +142,19 @@ The instance starts empty. We will run Jupyter Lab inside a Docker container tha
 3. When asked for a token, type: `scoped`
 
 You are now in Jupyter Lab. The folder `/home/ec2-user` on the instance is visible inside the container, so anything you put there (like the notebook) can be opened here.
+
+## Get the tutorial notebook
+
+Jupyter Lab is running, but the tutorial notebook still needs to get onto the instance. Pick whichever is easier:
+
+- **Upload from your laptop:** download `3_tutorial_noisepy_scedc_s3_explained.ipynb` from the [GitHub repository](https://github.com/cloudbank-project/cloudbank_showcase/blob/main/cloud_analysis_seismology/3_tutorial_noisepy_scedc_s3_explained.ipynb), then click the **Upload** button (the up-arrow icon at the top of Jupyter Lab's file browser) and select the file.
+- **Download directly on the instance:** open a second terminal (EC2 console → select the instance → **Connect** → **Connect**) and run:
+  ```bash
+  curl -LO https://raw.githubusercontent.com/cloudbank-project/cloudbank_showcase/main/cloud_analysis_seismology/3_tutorial_noisepy_scedc_s3_explained.ipynb
+  ```
+  (`-L` follows redirects, `-O` saves the file under its own name.) The file lands in `/home/ec2-user`, which is the folder Jupyter Lab shows you.
+
+Once the notebook appears in the file browser, double-click it to open it, then run it from top to bottom with the menu **Run → Run All Cells**. (Before the final stacking step you also need guide 2 — the notebook writes its results to an S3 bucket you own.)
 
 ## Stop the instance
 

@@ -24,7 +24,7 @@ This guide shows how to let your analysis read the public seismic data and write
 
 ## Configure the AWS CLI on your instance
 
-The Amazon Linux 2023 instance already has the AWS CLI installed, so we just need to give it your credentials. In your instance terminal (the one you opened with EC2 Instance Connect), run:
+The Amazon Linux 2023 instance already has the AWS CLI installed, so we just need to give it your credentials. The terminal from guide 1 is busy running the Jupyter container, so open a fresh one: in the EC2 console, select your instance and click **Connect** → **Connect** again. Then run:
 
 ```bash
 aws configure
@@ -39,7 +39,7 @@ Enter the values when prompted:
 
 ## Test access
 
-Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. (The form first asks for a **Bucket namespace** — keep **Global namespace** selected, and leave every other setting at its default.) Then, in your terminal:
+Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. (The form first asks for a **Bucket namespace** — keep **Global namespace** selected, and leave every other setting at its default.) S3 bucket names are shared across *all* AWS accounts worldwide, so if this one is already taken, add a suffix (for example `cloudbank-showcase-seismology-2`) and use that same name everywhere: in the commands below, in the notebook's `STACK_STORE_PATH` (see the next section), and in the policy JSON at the bottom of this page. Then, in your terminal:
 
 ```bash
 aws s3 ls
@@ -63,6 +63,8 @@ The notebook's stacking step writes its final results to S3. Set the path when y
 ```bash
 -e STACK_STORE_PATH=s3://cloudbank-showcase-seismology/noisepy-stacks
 ```
+
+If the container is already running without it, go to the terminal where Jupyter is running and press **Ctrl+C** to stop it (the container removes itself thanks to `--rm`), then start it again with the extra line. Your files are safe during the restart: they live in `/home/ec2-user` on the instance, not inside the container.
 
 Alternatively, edit the `STACK_STORE_PATH` fallback value inside the notebook itself. Without it, the notebook raises a clear error in the stacking cell telling you to set it.
 
@@ -106,3 +108,10 @@ Instead of `AmazonS3FullAccess`, create a policy with IAM → **Policies** → *
 ```
 
 Name it `s3-seismology-tutorial-access` and attach it to the user (Add permissions → Attach policies directly).
+
+> **Note:** with this policy, plain `aws s3 ls` (which lists *all* buckets in the account) returns an error, because it requires the separate `s3:ListAllMyBuckets` permission, which we intentionally did not grant. To test your access, use the bucket-specific commands from the "Test access" section instead:
+>
+> ```bash
+> aws s3 ls s3://cloudbank-showcase-seismology
+> aws s3 ls s3://scedc-pds/FDSNstationXML/CI/ | head
+> ```
