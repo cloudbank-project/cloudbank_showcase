@@ -1,170 +1,137 @@
 # EC2 + Docker + Jupyter + S3
 
-This tutorial will walk you thought getting on an AWS cloud instance from the ground up.
+This tutorial walks you through setting up an AWS cloud instance from scratch.
 
-## AWS web console access
+## Log into AWS
 
-* Login to [Cloudbank](https://cloudbank.org)
-* From the dashboard click on "Access Cloudbank Billing Accounts"
-* On the "Amazon Web Services" billing account, click on the `Login` button under "Public Cloud Web Console Login"
+1. Go to [CloudBank](https://cloudbank.org) and log in.
+2. On the dashboard, click **Access CloudBank Billing Accounts**.
+3. Find the **Amazon Web Services** billing account and click `Login` under *Public Cloud Web Console Login*.
 
-### Choosing a region
-An important aspect of cloud is that the computing and data centers are distributed around the world and labeled as "regions". For fastest connection to data storage on S3, we recommend to choose the region where the data is. To choose a region in AWS, follow these steps:
+You are now in the AWS Management Console.
 
-1. Log in to your AWS Management Console.
-2. In the top-right corner, click on the current region name (e.g., US East (N. Virginia)).
-3. In the dropdown menu that appears, select a region (for this tutorial let's use US West (Oregon)).
-4. After selecting the region, all AWS services you use will be hosted in that region.
+## Choose a region
 
-### Creating a security group to grant external access to an instance
+The region is where your cloud resources live. The seismic data we use is in the **US West (Oregon)** region, so use that one:
 
-### How to Create an EC2 Security Group with SSH (22), HTTP (80), and HTTPS (443)
+1. In the top-right corner of the AWS console, click the region name (for example, *US East (N. Virginia)*).
+2. Select **US West (Oregon)**.
+3. All AWS resources you create will now be in this region.
 
-Open the EC2 Console  
-AWS Console → **EC2**
+## Create a security group
 
-Go to “Security Groups”  
-Left sidebar → **Network & Security → Security Groups**
+A security group is a firewall for your instance. We will open three ports:
 
-Click **Create security group**
+- **22 (SSH)** to log in to the instance
+- **80** and **443 (HTTP/HTTPS)** to reach Jupyter Lab
 
-Basic Details  
-- Security group name: `web-ssh-access`  
-- Description: `Allow SSH and HTTP`
+1. In the AWS console, go to **EC2** (use the search bar at the top).
+2. In the left sidebar, click **Security Groups** (under *Network & Security*).
+3. Click **Create security group**.
+4. Fill in:
+   - Security group name: `web-ssh-access`
+   - Description: `Allow SSH and HTTP (for Jupyter)`
+5. Under **Inbound rules**, click **Add rule** three times and set:
 
-Add Inbound Rules  
-Click **Add rule** three times, for source select `Anywhere-IPv4`:
+   | Type | Protocol | Port | Source |
+   |------|----------|------|--------|
+   | SSH  | TCP      | 22   | `0.0.0.0/0` |
+   | HTTP | TCP      | 80   | `0.0.0.0/0` |
+   | HTTPS| TCP      | 443  | `0.0.0.0/0` |
 
-| Type | Protocol | Port | Source |
-|------|----------|------|--------|
-| SSH  | TCP      | 22   | `0.0.0.0/0` |
-| HTTP | TCP      | 80   | `0.0.0.0/0` |
-| HTTPS | TCP     | 443  | `0.0.0.0/0` |
+6. Leave everything else as default and click **Create security group**.
 
-Leave Outbound Rules as default (All traffic allowed)
+## Launch an instance
 
-Click **Create security group**
+An *instance* is a virtual computer in the cloud. We will create one with enough memory and disk for our analysis.
 
-Attach the Security Group to an EC2 Instance  
-- When launching a new instance, choose **Select existing security group** and pick `web-ssh-access`  
-- For an existing instance:  
-    Actions → Networking → Change security groups → select `web-ssh-access` → Save
+1. In the EC2 dashboard, click **Launch instance**.
+2. **Name**: give it a name, for example `seismology-tutorial`.
+3. **Application and OS Image**: keep the default **Amazon Linux** (Amazon Linux 2023).
+4. **Instance type**: search for `t2.xlarge` and select it (4 vCPU, 16 GiB RAM).
 
-Your instance now allows SSH on port 22 and HTTP on port 80.
+   > **Note:** `t2.xlarge` is not free tier eligible. You pay per hour while the instance is running; stop it when you are done (see "Stop the instance" at the end).
 
-### Launching an instance
-Launch an instance using **EC2 (Elastic Computing Cloud)**. Follow the steps below.
+5. **Key pair**: click **Create new key pair**, name it (for example `seismology-tutorial`), keep *RSA* and *.pem*, then **Create key pair** and download the `.pem` file. Keep it safe — you will not be able to download it again.
+6. **Network settings**: click **Edit**, then select **Select existing security group**, and choose `web-ssh-access`.
+7. **Configure storage**: change the default size to **20 GiB**.
+8. Click **Launch instance** and wait until the instance shows *Running*.
 
-1. In the AWS Management Console, search and navigate to the **EC2** dashboard using the `Search` box on the top.
-2. Click on **Launch Instance** to start the process of creating a new EC2 instance.
-4. **Application and OS Image**: Choose the default ``Amazon Linux`` (Amazon Linux 2023; the 64-bit x86 AMI).
-5. **Instance Type**: This specifies the RAM, vCPU, network, etc. `t2.xlarge` is recommended for this tutorial (4 vCPU / 16 GiB RAM — large enough for a one-day cross-correlation of a few stations).
-    
-    > **Note:** `t2.xlarge` is **not** free tier eligible; you pay on-demand hourly while the instance is running (see the "Terminating an instance" section below for stop/terminate guidance).
-6. **Key Pair**: Create a new key pair, or specify an existing one. Download the `.pem` file, move it to a location that you can have access to and remember where it is. 
-   
-    > **Note:**
-    > * If the file does not save as `.pem`, replace the extension with `.pem`.
-    > * For Windows users, download the type ED25519 and the `.ppk` file.
-    > * You can re-use the key created previously, if you still have access to that file.
+## Connect to the instance
 
-7. **Network Settings**: Select existing security group -> Select security group -> Select `web-ssh-access`. This allows traffics in and out of the instance and is required for SSH (port 22) and Jupyter lab connection.
-8. **Configure Storage**: Add more storage to your instance. 20 GiB will be sufficient for this tutorial.
-9. **Launch instance** with the current configuration. Wait until the instance showing a `Running` state on the console.
-10. **Connect to the instance**: AWS provides web-based connection where you don't need to have a SSH client installed. Click on your instance -> Connect -> EC2 Instance Connect.
-    
-    > **Note:**
-    > There are alternative ways connecting to the instance using the SSH client installed on your laptop.
-    >
-    > a. On **Linux/macOS**, copy the ssh link command in the folder where the PEM file is below and ssh to the instance. Be sure to change the permission of the key file so that it is only readable to you. You only need to do it once.
-    >
-    > ```bash
-    > chmod 400 file.pem
-    >
-    > ssh -i "file.pem" ec2-user@Your-Public-IPv4-DNS
-    > ```
-    >
-    > b. On **Windows**, login to an EC2 instance using **PuTTY** (a free SSH client):
-    > * Open PuTTY. On the PuTTY Configuration screen, click Session in the Category pane.
-    > * In the Host Name (or IP address) box, paste ``ec2-user@Your-Public-IPv4-DNS``. Your public IPv4 DNS can be found in the details of your EC2 instance.
-    > * Make sure Connection type: SSH is clicked
-    > * Back in the Category pane, expand Connection, expand SSH, and click Auth.
-    > * In the Private key file for AUTH/Credentials box, click browse and locate your ``.ppk`` file for the instance that you created and click. Depending on the version of Putty, 
-    > * Now click open and accept the connection.
+You can get a terminal in your browser — no SSH client needed:
 
-## Environment Configuration
-As you may notice, the EC2 you just launched has no user-specific software installed at all. Next we will configure the computing environment using a Docker container.
+1. In the Instances list, select your instance.
+2. Click **Connect**.
+3. Leave **EC2 Instance Connect** selected and click **Connect**.
+4. A terminal opens, showing a prompt like `[ec2-user@ip-... ~]$`.
 
-1. To install docker, run the following command. On Amazon Linux 2023 the package manager is **DNF** — use it directly rather than `yum` (the `yum` command exists only as a compatibility alias). Also start the Docker daemon with `systemctl` and enable it so it survives reboots:
+> **Prefer SSH from your own laptop?** On Linux/macOS:
+> ```bash
+> chmod 400 your-key.pem
+> ssh -i your-key.pem ec2-user@your-instance-public-dns
+> ```
+> Replace `your-key.pem` with your downloaded key file and `your-instance-public-dns` with the *Public IPv4 DNS* shown in the instance details.
 
-    ```bash
-    sudo dnf install docker -y
-    sudo systemctl enable --now docker
-    sudo usermod -a -G docker ec2-user
-    docker --version
+## Install Docker and Jupyter
 
-    # Upon successful installation, you would see:
-    # Docker version xx.x.x, build xxxxx
-    ```
+The instance starts empty. We will run Jupyter Lab inside a Docker container that already has everything installed.
 
-    > **Important:** Log out and back in (or run `newgrp docker`) before issuing any `docker` commands so the updated group membership takes effect. Otherwise you will see "permission denied" errors when trying to access the Docker daemon.
+1. Install Docker and start it:
 
-2. Pull the image. This will pull the Docker image named `ghcr.io/seisscoped/noisepy:centos7_jupyterlab` from the GitHub Container Registry.
-    ```bash
-    sudo docker pull ghcr.io/seisscoped/noisepy:centos7_jupyterlab
-    ```
+   ```bash
+   sudo dnf install docker -y
+   sudo systemctl enable --now docker
+   sudo usermod -a -G docker ec2-user
+   docker --version
+   ```
 
-3. Run the docker image as container (with HTTPS). This launches Jupyter Lab inside the container, forwards container port 8888 to port **443** on the EC2 instance, and enables HTTPS using a self-signed certificate tied to the instance Public DNS. Copy the *Public DNS (IPv4)* from the EC2 console, export it, and create the certificate pair:
+   > Log out and back in (or run `newgrp docker`) before using `docker` commands, so your user is recognized as part of the docker group.
 
-    ```bash
-    export URL="ec2-xxx-x-xxx-xx.us-west-2.compute.amazonaws.com"  # replace with your Public DNS
+2. Pull the container image:
 
-    mkdir -p /home/ec2-user/jupyter-cert
-    cd /home/ec2-user/jupyter-cert
+   ```bash
+   docker pull ghcr.io/seisscoped/noisepy:centos7_jupyterlab
+   ```
 
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout jupyter.key -out jupyter.crt \
-      -subj "/CN=${URL}"
-    ```
+3. Create a self-signed certificate so Jupyter can serve HTTPS. Copy the *Public IPv4 DNS* from the EC2 console and use it in the first command:
 
-    Start the container and mount the certificate directory so Jupyter Lab can serve HTTPS:
+   ```bash
+   export URL="ec2-xxx-x-xxx-xx.us-west-2.compute.amazonaws.com"  # your Public DNS
 
-    ```bash
-    docker run -p 443:8888 --rm -it \
-        --user $(id -u ec2-user):$(id -g ec2-user) \
-        -v /home/ec2-user:/home/scoped \
-        -v /home/ec2-user/jupyter-cert:/home/scoped/jupyter-cert \
-        -e HOME=/home/scoped \
-        ghcr.io/seisscoped/noisepy:centos7_jupyterlab \
-        jupyter lab --no-browser --ip=0.0.0.0 \
-            --IdentityProvider.token=scoped \
-            --certfile=/home/scoped/jupyter-cert/jupyter.crt \
-            --keyfile=/home/scoped/jupyter-cert/jupyter.key
-    ```
+   mkdir -p /home/ec2-user/jupyter-cert
+   cd /home/ec2-user/jupyter-cert
 
-An EC2 instance has two IP addresses: one for the AWS internal networking system, one open to the public. To access the notebook, you need to connect on the public IP address. Open a browser, type the Public IPv4 DNS of the instance, and navigate to `https://Your-Public-IPv4-DNS`. Because the certificate is self-signed you will see a browser warning—proceed after confirming the certificate details.
+   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+     -keyout jupyter.key -out jupyter.crt \
+     -subj "/CN=${URL}"
+   ```
 
-You will be prompted for a token. Please enter `scoped` (case sensitive), as we specified in `--IdentityProvider.token=scoped` argument.
+4. Start Jupyter Lab in the container. This maps port 443 of the instance to Jupyter's port 8888 and uses the certificate we just made:
 
-## Save the virtual image (optional)
+   ```bash
+   docker run -p 443:8888 --rm -it \
+     --user $(id -u ec2-user):$(id -g ec2-user) \
+     -v /home/ec2-user:/home/scoped \
+     -v /home/ec2-user/jupyter-cert:/home/scoped/jupyter-cert \
+     -e HOME=/home/scoped \
+     ghcr.io/seisscoped/noisepy:centos7_jupyterlab \
+     jupyter lab --no-browser --ip=0.0.0.0 \
+       --IdentityProvider.token=scoped \
+       --certfile=/home/scoped/jupyter-cert/jupyter.crt \
+       --keyfile=/home/scoped/jupyter-cert/jupyter.key
+   ```
 
-You can save the image (AMI) so that you can start from there next time. This can save time and effort in setting up the instance from scratch every time. Here are the steps to save the virtual image (AMI) of an EC2 instance in AWS:
+## Open Jupyter Lab
 
-In your AWS Management Console:
-1. Navigate to the EC2 dashboard.
-2. Select the EC2 instance that you want to save the image of.
-3. Right-click on the instance and click on "Create Image" in the dropdown menu.
-4. In the "Create Image" dialog box, enter a descriptive name for your image in the "Name" field.
-5. Optionally, you can add a description and tags to the image for easier management later on.
-6. Click on the "Create Image" button to start the image creation process.
-7. Wait for the image creation process to complete. This may take several minutes depending on the size of your instance and the amount of data being saved.
-8. Once the image has been created, it will appear in the "AMIs" section of the EC2 dashboard.
+1. In your web browser, go to `https://your-instance-public-ip` (the public address shown in the EC2 console).
+2. Your browser will show a security warning because the certificate is self-signed. Click *Advanced* and proceed anyway.
+3. When asked for a token, type: `scoped`
 
-You have to save it every time you want to save the current state of the instance.
+You are now in Jupyter Lab. The folder `/home/ec2-user` on the instance is visible inside the container, so anything you put there (like the notebook) can be opened here.
 
-## Terminating an instance
+## Stop the instance
 
-What is the difference between stop and terminate and instance: saving data vs cost. If you stop, you do not pay for the hardware, but you will pay for the EBS volume only and the data is saved in the EBS volume. If you terminate, all data will be wiped and you will cease to pay.
+When you are done, you can stop the instance to save money — you only pay for the disk, and your files are kept. If you terminate the instance instead, everything is deleted.
 
- > **Note:**
- > Visit [here](https://docs.rightscale.com/faq/clouds/aws/Whats_the_difference_between_Terminating_and_Stopping_an_EC2_Instance.html) to read more about stopping vs terminating.
+> Stop vs terminate: **Stop** keeps your data and costs only for the storage. **Terminate** deletes everything and stops all charges.

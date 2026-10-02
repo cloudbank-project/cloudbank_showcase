@@ -1,102 +1,96 @@
+# S3 Access Keys and the AWS CLI
 
-# Tutorial: Creating S3 Access Keys and Configuring AWS CLI
+This guide shows how to let your analysis read the public seismic data and write results to an S3 bucket you own. We will:
 
-This guide will walk you through creating AWS access keys for S3 read/write and configuring your local environment using `aws configure`.
+1. Create a user (access key) with exactly the needed permissions
+2. Tell the AWS CLI to use that user
+3. Test that it works
 
----
-
-## 1. Create an IAM User with S3 Permissions
+## Create the user and access key
 
 1. Log in to the [AWS Management Console](https://console.aws.amazon.com/).
-2. Navigate to **IAM** (Identity and Access Management).
+2. Go to **IAM** (you can search for it).
 3. In the sidebar, click **Users** > **Create user**.
-4. Enter a username (e.g., `s3-access-user`).
-5. Click **Next**.
-6. Attach permissions. Prefer a least-privilege policy scoped to the buckets you actually need. Avoid `AmazonS3FullAccess` unless you truly need administrator-level access. Create a customer-managed policy (IAM → **Policies** → **Create policy** → **JSON**) that grants **read-only** access to the public `scedc-pds` bucket and **read/write** access to your own project bucket, for example:
+4. Name it `s3-access-user` and click **Next**.
+5. Choose the simple option: **Attach policies directly**, then search for and select `AmazonS3FullAccess`. (This is fine for a tutorial; for a real project use the least-privilege policy at the bottom of this page instead.)
+6. Click **Next**, then **Create user**.
+7. Click on the new user, then on **Security credentials**.
+8. Click **Create access key**, choose **Command Line Interface (CLI)**, tick the confirmation box, click **Next**, then **Create access key**.
+9. **Copy both values now — you will not see the secret again:**
+   - Access Key ID
+   - Secret Access Key
 
-    ```json
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "ListBuckets",
-                "Effect": "Allow",
-                "Action": "s3:ListBucket",
-                "Resource": [
-                    "arn:aws:s3:::scedc-pds",
-                    "arn:aws:s3:::your-project-bucket"
-                ]
-            },
-            {
-                "Sid": "ReadSCEDCObjects",
-                "Effect": "Allow",
-                "Action": "s3:GetObject",
-                "Resource": "arn:aws:s3:::scedc-pds/*"
-            },
-            {
-                "Sid": "ReadWriteProjectObjects",
-                "Effect": "Allow",
-                "Action": [
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:DeleteObject"
-                ],
-                "Resource": "arn:aws:s3:::your-project-bucket/*"
-            }
-        ]
-    }
-    ```
+> **Keep them safe:** never commit access keys to git or paste them in chat. To use them on the EC2 instance, see the next section.
 
-    Replace `your-project-bucket` with the name of the S3 bucket you created to store your stack outputs (see `1_setup_instance.md` / the notebook). Click **Next**, name the policy (e.g., `s3-seismology-tutorial-access`), and **Create policy**. Then go back to the user, **Add permissions** → **Attach policies directly**, and select it.
-7. Click **Create user**.
-8. Click on the user just created.
-9. Under **Security credentials**, click **Create access key**.
-10. Select **Command Line Interface (CLI)**, tick the confirmation checkbox, click **Next**, and then **Create access key**.
-11. Save the **Access Key ID** and **Secret Access Key**. **You will not be able to see the secret again!**
-	- **Important:** Store the keys in a secure secrets manager and never commit them to git. When possible, prefer using an EC2 instance profile/role so you do not need long-lived access keys at all.
+## Configure the AWS CLI on your instance
 
----
-
-## 2. Configure AWS CLI with Your Access Keys
-
-> **Note:** On the Amazon Linux 2023 instances used in `1_setup_instance.md`, the AWS CLI v2 is already installed (`aws --version`). No installation step is needed. On other systems, install it from the [AWS CLI docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-
-Run the following command in your terminal (inside the Jupyter container's mounted home or on the EC2 instance):
+The Amazon Linux 2023 instance already has the AWS CLI installed, so we just need to give it your credentials. In your instance terminal (the one you opened with EC2 Instance Connect), run:
 
 ```bash
 aws configure
 ```
 
-You will be prompted for:
+Enter the values when prompted:
 
-1. **AWS Access Key ID**: Paste the key you copied earlier.
-2. **AWS Secret Access Key**: Paste the secret you copied earlier.
-3. **Default region name**: e.g., `us-west-2` (choose the region where your S3 bucket is located).
-4. **Default output format**: e.g., `json` (or leave blank).
+1. **AWS Access Key ID**: paste the key you copied.
+2. **AWS Secret Access Key**: paste the secret you copied.
+3. **Default region name**: `us-west-2`
+4. **Default output format**: `json`
 
-Your credentials will be saved in `~/.aws/credentials` and configuration in `~/.aws/config`.
+## Test access
 
----
-
-## 3. Test Your Configuration
-
-List your S3 buckets to verify access:
+Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. Then, in your terminal:
 
 ```bash
 aws s3 ls
 ```
 
-You should see a list of your S3 buckets. If you get a permissions error, check your IAM user permissions.
+You should see the S3 buckets in your account. If you get a permissions error, double-check the user permissions in IAM.
 
-You can also verify read access to the public SCEDC dataset and write access to your own bucket:
+You can also check that you can read the public SCEDC data and write to your own bucket:
 
 ```bash
 aws s3 ls s3://scedc-pds/FDSNstationXML/CI/ | head
-aws s3 ls s3://your-project-bucket
+aws s3 ls s3://your-bucket-name
 ```
 
 ---
 
-> **Security Note:**
->
-> Never share your AWS secret access key. Rotate keys regularly and use IAM policies with the least privilege required.
+## Least-privilege policy (recommended for real projects)
+
+Instead of `AmazonS3FullAccess`, create a policy with IAM → **Policies** → **Create policy** → **JSON** that allows only what is needed: read the public `scedc-pds` bucket, and read/write your own project bucket (`cloudbank-showcase-seismology` in this tutorial):
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ListBuckets",
+            "Effect": "Allow",
+            "Action": "s3:ListBucket",
+            "Resource": [
+                "arn:aws:s3:::scedc-pds",
+                "arn:aws:s3:::cloudbank-showcase-seismology"
+            ]
+        },
+        {
+            "Sid": "ReadSCEDCObjects",
+            "Effect": "Allow",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::scedc-pds/*"
+        },
+        {
+            "Sid": "ReadWriteProjectObjects",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::cloudbank-showcase-seismology/*"
+        }
+    ]
+}
+```
+
+Name it `s3-seismology-tutorial-access` and attach it to the user (Add permissions → Attach policies directly).
