@@ -57,8 +57,10 @@ Launch an instance using **EC2 (Elastic Computing Cloud)**. Follow the steps bel
 
 1. In the AWS Management Console, search and navigate to the **EC2** dashboard using the `Search` box on the top.
 2. Click on **Launch Instance** to start the process of creating a new EC2 instance.
-4. **Application and OS Image**: Choose the default ``Amazon linux``.
-5. **Instance Type**: This specifies the RAM, vCPU, network, etc. `t2.xlarge` is recommended for this tutorial.
+4. **Application and OS Image**: Choose the default ``Amazon Linux`` (Amazon Linux 2023; the 64-bit x86 AMI).
+5. **Instance Type**: This specifies the RAM, vCPU, network, etc. `t2.xlarge` is recommended for this tutorial (4 vCPU / 16 GiB RAM — large enough for a one-day cross-correlation of a few stations).
+    
+    > **Note:** `t2.xlarge` is **not** free tier eligible; you pay on-demand hourly while the instance is running (see the "Terminating an instance" section below for stop/terminate guidance).
 6. **Key Pair**: Create a new key pair, or specify an existing one. Download the `.pem` file, move it to a location that you can have access to and remember where it is. 
    
     > **Note:**
@@ -93,7 +95,7 @@ Launch an instance using **EC2 (Elastic Computing Cloud)**. Follow the steps bel
 ## Environment Configuration
 As you may notice, the EC2 you just launched has no user-specific software installed at all. Next we will configure the computing environment using a Docker container.
 
-1. To install docker, run the following command.
+1. To install docker, run the following command. On Amazon Linux 2023, `yum` maps to `dnf` and `service docker start` redirects to `systemctl`, so these commands work as written:
 
     ```bash
     sudo yum install docker -y

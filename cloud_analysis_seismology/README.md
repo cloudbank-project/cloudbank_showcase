@@ -17,7 +17,7 @@ This repository hosts step-by-step guides that show how to stand up an AWS-based
 
 1. **Provision the compute environment** by following `1_setup_instance.md`. When the container is running, connect to `https://<your-public-ip>` and supply the `scoped` token set in the Docker command.
 2. **Enable object storage access** with `2_read_write_object_storage.md` so the notebook can stream data to/from S3 using your IAM credentials.
-3. **Open the notebook** `3_tutorial_noisepy_scedc_s3_explained.ipynb` inside that Jupyter Lab session to run the full NoisePy example. Adjust regions, bucket names, or NoisePy parameters as needed for your project.
+3. **Open the notebook** `3_tutorial_noisepy_scedc_s3_explained.ipynb` inside that Jupyter Lab session to run the full NoisePy example. Adjust regions, bucket names, or NoisePy parameters as needed for your project. Before the stacking step, the notebook requires an S3 location for the stacked results — create a bucket you own and either set the `STACK_STORE_PATH` environment variable when starting the container (e.g., `STACK_STORE_PATH=s3://my-bucket/noisepy-stacks`) or edit the fallback path inside the notebook.
 
 ## Future Work (planned)
 
