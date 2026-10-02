@@ -39,7 +39,7 @@ Enter the values when prompted:
 
 ## Test access
 
-Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. Then, in your terminal:
+Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. (The form first asks for a **Bucket namespace** — keep **Global namespace** selected, and leave every other setting at its default.) Then, in your terminal:
 
 ```bash
 aws s3 ls
@@ -53,6 +53,18 @@ You can also check that you can read the public SCEDC data and write to your own
 aws s3 ls s3://scedc-pds/FDSNstationXML/CI/ | head
 aws s3 ls s3://your-bucket-name
 ```
+
+> With AWS CLI v2, piping into `head` may print a harmless `aws: [ERROR]: [Errno 32] Broken pipe` message at the end — you can ignore it (or append `2>/dev/null` to the command).
+
+## Point the notebook at your bucket
+
+The notebook's stacking step writes its final results to S3. Set the path when you start the Jupyter container from guide 1 by adding this line to the `docker run` command:
+
+```bash
+-e STACK_STORE_PATH=s3://cloudbank-showcase-seismology/noisepy-stacks
+```
+
+Alternatively, edit the `STACK_STORE_PATH` fallback value inside the notebook itself. Without it, the notebook raises a clear error in the stacking cell telling you to set it.
 
 ---
 
