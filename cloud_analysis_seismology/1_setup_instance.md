@@ -95,11 +95,11 @@ Launch an instance using **EC2 (Elastic Computing Cloud)**. Follow the steps bel
 ## Environment Configuration
 As you may notice, the EC2 you just launched has no user-specific software installed at all. Next we will configure the computing environment using a Docker container.
 
-1. To install docker, run the following command. On Amazon Linux 2023, `yum` maps to `dnf` and `service docker start` redirects to `systemctl`, so these commands work as written:
+1. To install docker, run the following command. On Amazon Linux 2023 the package manager is **DNF** — use it directly rather than `yum` (the `yum` command exists only as a compatibility alias). Also start the Docker daemon with `systemctl` and enable it so it survives reboots:
 
     ```bash
-    sudo yum install docker -y
-    sudo service docker start
+    sudo dnf install docker -y
+    sudo systemctl enable --now docker
     sudo usermod -a -G docker ec2-user
     docker --version
 
