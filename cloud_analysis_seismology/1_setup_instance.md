@@ -8,15 +8,16 @@ This tutorial walks you through setting up an AWS cloud instance from scratch.
 2. On the dashboard, click **Access CloudBank Billing Accounts**.
 3. Find the **Amazon Web Services** billing account and click the `login` link under *Public Cloud Web Console Login* (the link text is lowercase).
 
+> The first time, you may be routed through a CILogon page: select your institution and click **Log On** to continue.
+
 You are now in the AWS Management Console.
 
 ## Choose a region
 
 The region is where your cloud resources live. The seismic data we use is in the **US West (Oregon)** region, so use that one:
 
-1. In the top-right corner of the AWS console, click the region name (for example, *US East (N. Virginia)*).
-2. Select **US West (Oregon)**.
-3. All AWS resources you create will now be in this region.
+1. Check the region name in the top-right corner — the CloudBank federation usually drops you into **US West (Oregon)** already. If it shows a different region, click the region name and select **US West (Oregon)**.
+2. All AWS resources you create will now be in this region.
 
 ## Create a security group
 
@@ -54,7 +55,7 @@ An *instance* is a virtual computer in the cloud. We will create one with enough
 
    > **Note:** `t2.xlarge` is not free tier eligible. You pay per hour while the instance is running; stop it when you are done (see "Stop the instance" at the end).
 
-5. **Key pair**: click **Create new key pair**, name it (for example `seismology-tutorial`), keep *RSA* and *.pem*, then click **Create key pair**. A modal opens inside the wizard; the `.pem` file is downloaded automatically and the wizard then selects the new key pair for you. Keep the file safe — you will not be able to download it again.
+5. **Key pair**: click **Create new key pair**, name it (for example `seismology-tutorial`), keep *RSA* and *.pem*, then click **Create key pair**. A modal opens inside the wizard; the `.pem` file is downloaded automatically and the wizard then selects the new key pair for you. Keep the file safe — you will not be able to download it again. If you have run this tutorial before, Chrome may save it as `seismology-tutorial (1).pem` (or `(2)`, …) — use the most recent file when connecting with SSH.
 6. **Network settings**: click **Edit**, then select **Select existing security group**, and choose `web-ssh-access`.
 7. **Configure storage**: change the default size to **20 GiB**.
 8. Click **Launch instance** and wait until the instance shows *Running*.
@@ -67,7 +68,9 @@ You can get a terminal in your browser — no SSH client needed:
 2. Wait until the status checks pass (usually a minute or two — look for "2/2 checks passed" next to the instance state) before connecting.
 3. Click **Connect**.
 4. Leave **EC2 Instance Connect** selected and click **Connect** (do not click the "Connect assist" button next to it).
-5. A terminal opens, showing a prompt like `[ec2-user@ip-... ~]$`.
+5. A terminal opens in the same browser tab (it replaces the console page) and shows a prompt like `[ec2-user@ip-... ~]$`.
+
+> The browser terminal may disconnect if it sits idle for a while — just click **Connect** → **Connect** again; anything you ran earlier is still there.
 
 > **Prefer SSH from your own laptop?** On Linux/macOS:
 > ```bash

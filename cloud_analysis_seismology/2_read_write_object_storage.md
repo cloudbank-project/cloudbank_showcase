@@ -39,7 +39,7 @@ Enter the values when prompted:
 
 ## Test access
 
-Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. (The form first asks for a **Bucket namespace** — keep **Global namespace** selected, and leave every other setting at its default.) S3 bucket names are shared across *all* AWS accounts worldwide, so if this one is already taken, add a suffix (for example `cloudbank-showcase-seismology-2`) and use that same name everywhere: in the commands below, in the notebook's `STACK_STORE_PATH` (see the next section), and in the policy JSON at the bottom of this page. Then, in your terminal:
+Before testing, make sure the bucket you want to write results to exists: in the S3 console, click **Create bucket**, name it `cloudbank-showcase-seismology`, and keep the default settings. (The form first asks for a **Bucket namespace** — keep **Global namespace** selected even if the console marks *Account Regional* as (recommended); Global is fine for this tutorial and keeps the `s3://bucket-name` addresses the notebook expects. Leave every other setting at its default.) S3 bucket names are shared across *all* AWS accounts worldwide, so if this one is already taken, add a suffix (for example `cloudbank-showcase-seismology-2`) and use that same name everywhere: in the commands below, in the notebook's `STACK_STORE_PATH` (see the next section), and in the policy JSON at the bottom of this page. Then, in your terminal:
 
 ```bash
 aws s3 ls
