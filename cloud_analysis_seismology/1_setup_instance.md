@@ -1,168 +1,166 @@
 # EC2 + Docker + Jupyter + S3
 
-This tutorial will walk you thought getting on an AWS cloud instance from the ground up.
+This tutorial walks you through setting up an AWS cloud instance from scratch.
 
-## AWS web console access
+## Log into AWS
 
-* Login to [Cloudbank](https://cloudbank.org)
-* From the dashboard click on "Access Cloudbank Billing Accounts"
-* On the "Amazon Web Services" billing account, click on the `Login` button under "Public Cloud Web Console Login"
+1. Go to [CloudBank](https://cloudbank.org) and log in.
+2. On the dashboard, click **Access CloudBank Billing Accounts**.
+3. Find the **Amazon Web Services** billing account and click the `login` link under *Public Cloud Web Console Login* (the link text is lowercase).
 
-### Choosing a region
-An important aspect of cloud is that the computing and data centers are distributed around the world and labeled as "regions". For fastest connection to data storage on S3, we recommend to choose the region where the data is. To choose a region in AWS, follow these steps:
+> The first time, you may be routed through a CILogon page: select your institution and click **Log On** to continue.
 
-1. Log in to your AWS Management Console.
-2. In the top-right corner, click on the current region name (e.g., US East (N. Virginia)).
-3. In the dropdown menu that appears, select a region (for this tutorial let's use US West (Oregon)).
-4. After selecting the region, all AWS services you use will be hosted in that region.
+You are now in the AWS Management Console.
 
-### Creating a security group to grant external access to an instance
+## Choose a region
 
-### How to Create an EC2 Security Group with SSH (22), HTTP (80), and HTTPS (443)
+The region is where your cloud resources live. The seismic data we use is in the **US West (Oregon)** region, so use that one:
 
-Open the EC2 Console  
-AWS Console → **EC2**
+1. Check the region name in the top-right corner — the CloudBank federation usually drops you into **US West (Oregon)** already. If it shows a different region, click the region name and select **US West (Oregon)**.
+2. All AWS resources you create will now be in this region.
 
-Go to “Security Groups”  
-Left sidebar → **Network & Security → Security Groups**
+## Create a security group
 
-Click **Create security group**
+A security group is a firewall for your instance. We will open three ports:
 
-Basic Details  
-- Security group name: `web-ssh-access`  
-- Description: `Allow SSH and HTTP`
+- **22 (SSH)** to log in to the instance
+- **80** and **443 (HTTP/HTTPS)** to reach Jupyter Lab
 
-Add Inbound Rules  
-Click **Add rule** three times, for source select `Anywhere-IPv4`:
+1. In the AWS console, go to **EC2** (use the search bar at the top).
+2. In the left sidebar, click **Security Groups** (under *Network & Security*).
+3. Click **Create security group**.
+4. Fill in:
+   - Security group name: `web-ssh-access`
+   - Description: `Allow SSH and HTTP (for Jupyter)`
+5. Under **Inbound rules**, click **Add rule** three times and set:
 
-| Type | Protocol | Port | Source |
-|------|----------|------|--------|
-| SSH  | TCP      | 22   | `0.0.0.0/0` |
-| HTTP | TCP      | 80   | `0.0.0.0/0` |
-| HTTPS | TCP     | 443  | `0.0.0.0/0` |
+   | Type | Protocol | Port | Source |
+   |------|----------|------|--------|
+   | SSH  | TCP      | 22   | `0.0.0.0/0` |
+   | HTTP | TCP      | 80   | `0.0.0.0/0` |
+   | HTTPS| TCP      | 443  | `0.0.0.0/0` |
 
-Leave Outbound Rules as default (All traffic allowed)
+   > Each new rule starts as *Custom TCP* with port `0` and no source. Pick the **Type** (SSH/HTTP/HTTPS) and the port fills in automatically. For **Source**, choose **Anywhere-IPv4** (which represents `0.0.0.0/0`), or paste `0.0.0.0/0` into the source box and press Enter. The console shows a yellow warning about allowing all IP addresses — it is expected and can be ignored for this tutorial.
 
-Click **Create security group**
+6. Leave everything else as default and click **Create security group**.
 
-Attach the Security Group to an EC2 Instance  
-- When launching a new instance, choose **Select existing security group** and pick `web-ssh-access`  
-- For an existing instance:  
-    Actions → Networking → Change security groups → select `web-ssh-access` → Save
+## Launch an instance
 
-Your instance now allows SSH on port 22 and HTTP on port 80.
+An *instance* is a virtual computer in the cloud. We will create one with enough memory and disk for our analysis.
 
-### Launching an instance
-Launch an instance using **EC2 (Elastic Computing Cloud)**. Follow the steps below.
+1. In the EC2 dashboard, click **Launch instance**.
+2. **Name**: give it a name, for example `seismology-tutorial`.
+3. **Application and OS Image**: keep the default **Amazon Linux** (Amazon Linux 2023).
+4. **Instance type**: click the instance-type box, type `t2.xlarge` into the search field that appears, and pick `t2.xlarge` from the list (4 vCPU, 16 GiB RAM).
 
-1. In the AWS Management Console, search and navigate to the **EC2** dashboard using the `Search` box on the top.
-2. Click on **Launch Instance** to start the process of creating a new EC2 instance.
-4. **Application and OS Image**: Choose the default ``Amazon linux``.
-5. **Instance Type**: This specifies the RAM, vCPU, network, etc. `t2.xlarge` is recommended for this tutorial.
-6. **Key Pair**: Create a new key pair, or specify an existing one. Download the `.pem` file, move it to a location that you can have access to and remember where it is. 
-   
-    > **Note:**
-    > * If the file does not save as `.pem`, replace the extension with `.pem`.
-    > * For Windows users, download the type ED25519 and the `.ppk` file.
-    > * You can re-use the key created previously, if you still have access to that file.
+   > **Note:** `t2.xlarge` is not free tier eligible. You pay per hour while the instance is running; stop it when you are done (see "Stop the instance" at the end).
 
-7. **Network Settings**: Select existing security group -> Select security group -> Select `web-ssh-access`. This allows traffics in and out of the instance and is required for SSH (port 22) and Jupyter lab connection.
-8. **Configure Storage**: Add more storage to your instance. 20 GiB will be sufficient for this tutorial.
-9. **Launch instance** with the current configuration. Wait until the instance showing a `Running` state on the console.
-10. **Connect to the instance**: AWS provides web-based connection where you don't need to have a SSH client installed. Click on your instance -> Connect -> EC2 Instance Connect.
-    
-    > **Note:**
-    > There are alternative ways connecting to the instance using the SSH client installed on your laptop.
-    >
-    > a. On **Linux/macOS**, copy the ssh link command in the folder where the PEM file is below and ssh to the instance. Be sure to change the permission of the key file so that it is only readable to you. You only need to do it once.
-    >
-    > ```bash
-    > chmod 400 file.pem
-    >
-    > ssh -i "file.pem" ec2-user@Your-Public-IPv4-DNS
-    > ```
-    >
-    > b. On **Windows**, login to an EC2 instance using **PuTTY** (a free SSH client):
-    > * Open PuTTY. On the PuTTY Configuration screen, click Session in the Category pane.
-    > * In the Host Name (or IP address) box, paste ``ec2-user@Your-Public-IPv4-DNS``. Your public IPv4 DNS can be found in the details of your EC2 instance.
-    > * Make sure Connection type: SSH is clicked
-    > * Back in the Category pane, expand Connection, expand SSH, and click Auth.
-    > * In the Private key file for AUTH/Credentials box, click browse and locate your ``.ppk`` file for the instance that you created and click. Depending on the version of Putty, 
-    > * Now click open and accept the connection.
+5. **Key pair**: click **Create new key pair**, name it (for example `seismology-tutorial`), keep *RSA* and *.pem*, then click **Create key pair**. A modal opens inside the wizard; the `.pem` file is downloaded automatically and the wizard then selects the new key pair for you. Keep the file safe — you will not be able to download it again. If you have run this tutorial before, Chrome may save it as `seismology-tutorial (1).pem` (or `(2)`, …) — use the most recent file when connecting with SSH.
+6. **Network settings**: click **Edit**, then select **Select existing security group**, and choose `web-ssh-access`.
+7. **Configure storage**: change the default size to **20 GiB**.
+8. Click **Launch instance** and wait until the instance shows *Running*.
 
-## Environment Configuration
-As you may notice, the EC2 you just launched has no user-specific software installed at all. Next we will configure the computing environment using a Docker container.
+## Connect to the instance
 
-1. To install docker, run the following command.
+You can get a terminal in your browser — no SSH client needed:
 
-    ```bash
-    sudo yum install docker -y
-    sudo service docker start
-    sudo usermod -a -G docker ec2-user
-    docker --version
+1. In the Instances list, select your instance.
+2. Wait until the status checks pass (usually a minute or two — look for "2/2 checks passed" next to the instance state) before connecting.
+3. Click **Connect**.
+4. Leave **EC2 Instance Connect** selected and click **Connect** (do not click the "Connect assist" button next to it).
+5. A terminal opens in the same browser tab (it replaces the console page) and shows a prompt like `[ec2-user@ip-... ~]$`.
 
-    # Upon successful installation, you would see:
-    # Docker version xx.x.x, build xxxxx
-    ```
+> The browser terminal may disconnect if it sits idle for a while — just click **Connect** → **Connect** again; anything you ran earlier is still there.
 
-    > **Important:** Log out and back in (or run `newgrp docker`) before issuing any `docker` commands so the updated group membership takes effect. Otherwise you will see "permission denied" errors when trying to access the Docker daemon.
+> **Prefer SSH from your own laptop?** On Linux/macOS:
+> ```bash
+> chmod 400 your-key.pem
+> ssh -i your-key.pem ec2-user@your-instance-public-ip
+> ```
+> Replace `your-key.pem` with your downloaded key file and `your-instance-public-ip` with the *Public IPv4 address* shown in the instance details.
 
-2. Pull the image. This will pull the Docker image named `ghcr.io/seisscoped/noisepy:centos7_jupyterlab` from the GitHub Container Registry.
-    ```bash
-    sudo docker pull ghcr.io/seisscoped/noisepy:centos7_jupyterlab
-    ```
+## Install Docker and Jupyter
 
-3. Run the docker image as container (with HTTPS). This launches Jupyter Lab inside the container, forwards container port 8888 to port **443** on the EC2 instance, and enables HTTPS using a self-signed certificate tied to the instance Public DNS. Copy the *Public DNS (IPv4)* from the EC2 console, export it, and create the certificate pair:
+The instance starts empty. We will run Jupyter Lab inside a Docker container that already has everything installed.
 
-    ```bash
-    export URL="ec2-xxx-x-xxx-xx.us-west-2.compute.amazonaws.com"  # replace with your Public DNS
+1. Install Docker and start it:
 
-    mkdir -p /home/ec2-user/jupyter-cert
-    cd /home/ec2-user/jupyter-cert
+   ```bash
+   sudo dnf install docker -y
+   sudo systemctl enable --now docker
+   sudo usermod -a -G docker ec2-user
+   docker --version
+   ```
 
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout jupyter.key -out jupyter.crt \
-      -subj "/CN=${URL}"
-    ```
+   > Log out and back in (or run `newgrp docker`) before using `docker` commands, so your user is recognized as part of the docker group.
 
-    Start the container and mount the certificate directory so Jupyter Lab can serve HTTPS:
+2. Pull the container image:
 
-    ```bash
-    docker run -p 443:8888 --rm -it \
-        --user $(id -u ec2-user):$(id -g ec2-user) \
-        -v /home/ec2-user:/home/scoped \
-        -v /home/ec2-user/jupyter-cert:/home/scoped/jupyter-cert \
-        -e HOME=/home/scoped \
-        ghcr.io/seisscoped/noisepy:centos7_jupyterlab \
-        jupyter lab --no-browser --ip=0.0.0.0 \
-            --IdentityProvider.token=scoped \
-            --certfile=/home/scoped/jupyter-cert/jupyter.crt \
-            --keyfile=/home/scoped/jupyter-cert/jupyter.key
-    ```
+   ```bash
+   docker pull ghcr.io/seisscoped/noisepy:centos7_jupyterlab
+   ```
 
-An EC2 instance has two IP addresses: one for the AWS internal networking system, one open to the public. To access the notebook, you need to connect on the public IP address. Open a browser, type the Public IPv4 DNS of the instance, and navigate to `https://Your-Public-IPv4-DNS`. Because the certificate is self-signed you will see a browser warning—proceed after confirming the certificate details.
+3. Create a self-signed certificate so Jupyter can serve HTTPS. In the EC2 console, select your instance and copy its **Public IPv4 address** (shown in the instance details), then use it in the first command:
 
-You will be prompted for a token. Please enter `scoped` (case sensitive), as we specified in `--IdentityProvider.token=scoped` argument.
+   ```bash
+   export URL="54.200.100.20"  # your Public IPv4 address
 
-## Save the virtual image (optional)
+   mkdir -p /home/ec2-user/jupyter-cert
+   cd /home/ec2-user/jupyter-cert
 
-You can save the image (AMI) so that you can start from there next time. This can save time and effort in setting up the instance from scratch every time. Here are the steps to save the virtual image (AMI) of an EC2 instance in AWS:
+   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+     -keyout jupyter.key -out jupyter.crt \
+     -subj "/CN=${URL}"
+   ```
 
-In your AWS Management Console:
-1. Navigate to the EC2 dashboard.
-2. Select the EC2 instance that you want to save the image of.
-3. Right-click on the instance and click on "Create Image" in the dropdown menu.
-4. In the "Create Image" dialog box, enter a descriptive name for your image in the "Name" field.
-5. Optionally, you can add a description and tags to the image for easier management later on.
-6. Click on the "Create Image" button to start the image creation process.
-7. Wait for the image creation process to complete. This may take several minutes depending on the size of your instance and the amount of data being saved.
-8. Once the image has been created, it will appear in the "AMIs" section of the EC2 dashboard.
+   > Use the **Public IPv4 address**, not the *Private IP*: the certificate must match the address you type in the browser. (Some AWS accounts, including CloudBank's, do not assign a public DNS name to instances — the public IP address works the same way.)
 
-You have to save it every time you want to save the current state of the instance.
+4. Start Jupyter Lab in the container. This maps port 443 of the instance to Jupyter's port 8888 and uses the certificate we just made:
 
-## Terminating an instance
+   ```bash
+   docker run -p 443:8888 --rm -it \
+     --user $(id -u ec2-user):$(id -g ec2-user) \
+     -v /home/ec2-user:/home/scoped \
+     -v /home/ec2-user/jupyter-cert:/home/scoped/jupyter-cert \
+     -e HOME=/home/scoped \
+     ghcr.io/seisscoped/noisepy:centos7_jupyterlab \
+     jupyter lab --no-browser --ip=0.0.0.0 \
+       --IdentityProvider.token=scoped \
+       --certfile=/home/scoped/jupyter-cert/jupyter.crt \
+       --keyfile=/home/scoped/jupyter-cert/jupyter.key
+   ```
 
-What is the difference between stop and terminate and instance: saving data vs cost. If you stop, you do not pay for the hardware, but you will pay for the EBS volume only and the data is saved in the EBS volume. If you terminate, all data will be wiped and you will cease to pay.
+   > **S3 results:** the notebook saves its stacked results to an S3 bucket you own. If you already created the bucket (next guide), add this line to the command above, right after `-e HOME=/home/scoped`:
+   > ```bash
+   > -e STACK_STORE_PATH=s3://cloudbank-showcase-seismology/noisepy-stacks
+   > ```
+   > If you skip it, the notebook will ask you to set it before the stacking step (see the note at the end of guide 2).
 
- > **Note:**
- > Visit [here](https://docs.rightscale.com/faq/clouds/aws/Whats_the_difference_between_Terminating_and_Stopping_an_EC2_Instance.html) to read more about stopping vs terminating.
+   > **This terminal is now busy** running the Jupyter container — leave it open. Whenever you need another terminal on the instance (for example in the next guide), simply connect again: EC2 console → **Instances** → select the instance → **Connect** → **Connect**.
+
+## Open Jupyter Lab
+
+1. In your web browser, go to `https://your-instance-public-ip` (the public address shown in the EC2 console).
+2. Your browser will show a "Your connection is not private" warning because the certificate is self-signed. Click **Advanced**, then click **Proceed to \<your-instance\> (unsafe)**.
+3. When asked for a token, type: `scoped`
+
+You are now in Jupyter Lab. The folder `/home/ec2-user` on the instance is visible inside the container, so anything you put there (like the notebook) can be opened here.
+
+## Get the tutorial notebook
+
+Jupyter Lab is running, but the tutorial notebook still needs to get onto the instance. Pick whichever is easier:
+
+- **Upload from your laptop:** download `3_tutorial_noisepy_scedc_s3_explained.ipynb` from the [GitHub repository](https://github.com/cloudbank-project/cloudbank_showcase/blob/main/cloud_analysis_seismology/3_tutorial_noisepy_scedc_s3_explained.ipynb), then click the **Upload** button (the up-arrow icon at the top of Jupyter Lab's file browser) and select the file.
+- **Download directly on the instance:** open a second terminal (EC2 console → select the instance → **Connect** → **Connect**) and run:
+  ```bash
+  curl -LO https://raw.githubusercontent.com/cloudbank-project/cloudbank_showcase/main/cloud_analysis_seismology/3_tutorial_noisepy_scedc_s3_explained.ipynb
+  ```
+  (`-L` follows redirects, `-O` saves the file under its own name.) The file lands in `/home/ec2-user`, which is the folder Jupyter Lab shows you.
+
+Once the notebook appears in the file browser, double-click it to open it, then run it from top to bottom with the menu **Run → Run All Cells**. (Before the final stacking step you also need guide 2 — the notebook writes its results to an S3 bucket you own.)
+
+## Stop the instance
+
+When you are done, you can stop the instance to save money — you only pay for the disk, and your files are kept. If you terminate the instance instead, everything is deleted.
+
+> Stop vs terminate: **Stop** keeps your data and costs only for the storage. **Terminate** deletes everything and stops all charges.

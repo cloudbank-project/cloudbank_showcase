@@ -4,12 +4,14 @@ Tutorials that demonstrate how to use cloud resources provided by [CloudBank](ht
 
 ## Tutorials
 
-| Tutorial | Domain | Cloud Provider | Resources Used |
-|----------|--------|---------------|----------------|
-| [Cloud Seismology Analysis](cloud_analysis_seismology/) | Seismology | AWS | EC2, S3, Docker/Jupyter |
-| [GPU Computing in Oceanography](gpu_computing_oceanography/) | Oceanography | Google Cloud | GPU instance (A100), Jupyter |
-| [Knowledge Graphs for Chemistry](knowledge_graphs_chemistry/) | Chemistry / Bioinformatics | AWS | S3, Neptune, EC2, ECS/Fargate |
-| [Toy Data Portal for Hydrology](toy_data_portal_hydrology/) | Hydrology | Google Cloud | GKE Autopilot, JupyterHub, Cloud Storage |
+| Tutorial | Domain | Cloud Provider | Resources Used | Last Verified |
+|----------|--------|---------------|----------------|---------------|
+| [Cloud Seismology Analysis](cloud_analysis_seismology/) | Seismology | AWS | EC2, S3, Docker/Jupyter | Oct 2026 |
+| [GPU Computing in Oceanography](gpu_computing_oceanography/) | Oceanography | Google Cloud | GPU instance (A100), Jupyter | — |
+| [Knowledge Graphs for Chemistry](knowledge_graphs_chemistry/) | Chemistry / Bioinformatics | AWS | S3, Neptune, EC2, ECS/Fargate | — |
+| [Toy Data Portal for Hydrology](toy_data_portal_hydrology/) | Hydrology | Google Cloud | GKE Autopilot, JupyterHub, Cloud Storage | — |
+
+All tutorials are reviewed end-to-end from time to time so that they keep working on the latest cloud consoles. When a tutorial has been re-verified end-to-end, its date is updated here; fixes and improvements land in the tutorial folder itself.
 
 ### Cloud Seismology Analysis
 
