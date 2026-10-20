@@ -139,7 +139,7 @@ SSH into the server, clone the showcase repository, then install all required Ju
 
 **Commands:**
 ```bash
-git clone https://github.com/zonca/cloudbank_showcase.git
+git clone https://github.com/cloudbank-project/cloudbank_showcase.git
 cd cloudbank_showcase/gpu_computing_oceanography/
 ```
 

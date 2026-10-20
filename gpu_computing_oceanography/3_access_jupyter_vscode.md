@@ -76,7 +76,7 @@ Expected output: `julia version 1.11.9`
 
 **Option A - Clone repository:**
 ```bash
-git clone https://github.com/zonca/cloudbank_showcase.git
+git clone https://github.com/cloudbank-project/cloudbank_showcase.git
 cd cloudbank_showcase/gpu_computing_oceanography
 ```
 
