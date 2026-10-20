@@ -42,12 +42,18 @@ I need to create a GPU instance with:
 - Zone: us-west1-b
 - Machine type: n1-standard-4
 - GPU: nvidia-tesla-t4 (1 GPU)
-- Image: ubuntu-2204-lts
+- Image: ubuntu-2204-lts (specify with --image-family)
 - Boot disk: 200GB SSD
 - Maintenance policy: TERMINATE
 
 Please create this instance using gcloud compute instances create.
 ```
+
+> **Image flag:** use `--image-family=ubuntu-2204-lts` in the creation command (not
+> `--image=ubuntu-2204-lts`). On current gcloud (verified with gcloud 587.0.0,
+> October 2026), `--image=ubuntu-2204-lts` no longer resolves image family names and
+> fails with "referenced image resource cannot be found"; `--image-family` is the flag
+> that resolves the family, and it is what Gemini uses above.
 
 Do NOT ask Gemini to enable the `install-nvidia-driver=True` metadata flag. On Ubuntu 22.04
 that flag sets the metadata but does not install a driver (verified: after boot there was no
@@ -60,7 +66,7 @@ The instance julia-ocean-gpu has been created successfully in us-west1-b.
 I've configured the instance with the following specifications:
  - Machine Type: n1-standard-4 (x86)
  - GPU: 1x nvidia-tesla-t4
- - Image: ubuntu-2204-lts (x86_64). Note that I used the x86 version instead of arm64 because the T4 accelerator and N1 machine family are x86-based.
+ - Image: ubuntu-2204-lts (x86_64, specified with --image-family; resolved to ubuntu-2204-jammy-v20261016). Note that I used the x86 version instead of arm64 because the T4 accelerator and N1 machine family are x86-based.
  - Boot Disk: 200GB SSD (pd-ssd).
  - No NVIDIA driver was installed; we will install it with explicit commands in Step 5.
 ```

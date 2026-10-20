@@ -105,16 +105,16 @@ Expected output:
 ```
 CUDA toolchain: 
 - runtime 13.2, artifact installation
-- driver 580.178.4 for 13.2
+- driver 580.178.4 for 13.3
 - compiler 13.3, artifact installation
 
 CUDA libraries: 
-- CUBLAS: 13.3.0
+- CUBLAS: 13.4.0
 - CURAND: 10.4.2
 - CUFFT: 12.2.0
-- CUSOLVER: 12.1.0
-- CUSPARSE: 12.7.9
-- CUPTI: 2026.1.0 (API 13.2.0)
+- CUSOLVER: 12.2.0
+- CUSPARSE: 12.7.10
+- CUPTI: 2026.1.1 (API 13.2.1)
 - NVML: 13.0.0+580.178.4
 
 Julia packages: 
@@ -122,9 +122,9 @@ Julia packages:
 - GPUArrays: 11.5.16
 - GPUCompiler: 1.17.1
 - KernelAbstractions: 0.9.45
-- CUDA_Driver_jll: 13.2.0+0
-- CUDA_Compiler_jll: 0.4.2+0
-- CUDA_Runtime_jll: 0.21.0+0
+- CUDA_Driver_jll: 13.3.5+0
+- CUDA_Compiler_jll: 0.4.4+1
+- CUDA_Runtime_jll: 0.21.0+1
 
 Toolchain:
 - Julia: 1.11.9

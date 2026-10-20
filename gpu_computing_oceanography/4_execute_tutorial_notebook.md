@@ -49,3 +49,19 @@ Proceed to run the subsequent cells in the notebook.
 * It will initialize the variables (e.g. `Nx=48`, `Ny=96`, `Nz=32`).
 * You'll observe output detailing the time steps and simulation progress, taking advantage of the GPU.
 * The final cell will visualize the results (e.g., "Surface Temperature" heatmap) using CairoMakie, confirming the simulation successfully executed and produced data.
+
+## Optional: Execute the notebook headless with nbconvert
+
+Instead of the Jupyter UI, you can execute and re-render the notebook from a terminal:
+
+```bash
+jupyter nbconvert --to notebook --execute --inplace \
+  --ExecutePreprocessor.kernel_name=julia-1.11 ocean_gpu_tutorial.ipynb
+```
+
+The `--ExecutePreprocessor.kernel_name` value must match an installed kernel, or
+`nbconvert --execute` stops with `NoSuchKernel`. Check the installed names with
+`jupyter kernelspec list` (a fresh IJulia install registers `julia-1.11`, which is also
+what the notebook metadata declares). If the notebook metadata and the installed kernel
+name differ, either fix the notebook metadata or pass the name that is actually
+installed.

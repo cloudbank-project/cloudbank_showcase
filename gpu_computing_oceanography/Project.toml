@@ -1,3 +1,4 @@
+# Reactant is pinned to 0.2.269 in the tutorial guide (issue #13 verification, Oct 2026); see 1_create_gpu_instance.md
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3b488f0c"
 ClimaOcean = "3239a584-3c97-4081-9b16-56f4d2f8319e"
