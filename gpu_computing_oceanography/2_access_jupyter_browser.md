@@ -9,11 +9,20 @@ Goal: Configure firewall rules and access the Jupyter notebook running on your G
 - Perfect for Chromebooks and mobile devices
 
 ## Prerequisites
-- Completed tutorial 1 (GPU instance created)
+- Completed tutorial 1 (GPU instance created, Julia packages installed, Jupyter kernels registered)
 - Jupyter not yet running on the server
 
 ### Step 1: Launch Jupyter notebook securely
-Ask Gemini to start Jupyter with authentication enabled:
+First, make sure the notebook server is installed on the instance (tutorial 1 installs it, but
+if you skipped that part of the setup, install it now):
+```bash
+sudo apt-get install -y jupyter-nbconvert jupyter-notebook
+```
+`jupyter-notebook` (6.4.8 on Ubuntu 22.04) provides the notebook server; `jupyter-nbconvert`
+alone is NOT sufficient because IJulia's `notebook(...)` launch requires the `notebook`
+subcommand.
+
+Then ask Gemini to start Jupyter with authentication enabled:
 ```
 SSH into the server and launch Jupyter notebook using IJulia so it is accessible over the network and runs in the background.
 ```
@@ -36,7 +45,7 @@ Show me the Jupyter server URL including the token from the running Jupyter proc
 Ask Gemini to create a firewall rule to allow access to Jupyter:
 ```
 Create a firewall rule to allow access to port 8888 for Jupyter notebook. The rule should allow TCP traffic from any IP address.
-Then show the the full connection url for Jupyter including the external IP and the token
+Then show the full connection URL for Jupyter including the external IP and the token.
 ```
 
 **Expected firewall rule creation:**
@@ -51,6 +60,9 @@ Gemini will also provide the connection URL with a token, typically looking like
 ```
 http://xxx.xxx.xxx.xxx:8888/?token=abcdef1234567890...
 ```
+
+> **Note:** If the firewall creation says the rule `allow-jupyter` already exists, that is
+> fine: the project already has the rule, so just continue (do not create a duplicate).
 
 ### Step 3: Open in the browser
 Paste the URL from the previous step into your web browser to access the Jupyter notebook interface.
@@ -69,8 +81,8 @@ Expected output should show:
 ```
 CUDA toolchain: 
 - runtime 13.2, artifact installation
-- driver 535.288.1 for 13.2
-- compiler 13.2
+- driver 580.178.4 for 13.2
+- compiler 13.3, artifact installation
 
 CUDA libraries: 
 - CUBLAS: 13.3.0
@@ -79,13 +91,13 @@ CUDA libraries:
 - CUSOLVER: 12.1.0
 - CUSPARSE: 12.7.9
 - CUPTI: 2026.1.0 (API 13.2.0)
-- NVML: 12.0.0+535.288.1
+- NVML: 13.0.0+580.178.4
 
 Julia packages: 
-- CUDA: 5.11.0
-- GPUArrays: 11.4.1
-- GPUCompiler: 1.9.1
-- KernelAbstractions: 0.9.41
+- CUDA: 5.11.3
+- GPUArrays: 11.5.16
+- GPUCompiler: 1.17.1
+- KernelAbstractions: 0.9.45
 - CUDA_Driver_jll: 13.2.0+0
 - CUDA_Compiler_jll: 0.4.2+0
 - CUDA_Runtime_jll: 0.21.0+0
@@ -95,10 +107,17 @@ Toolchain:
 - LLVM: 16.0.6
 
 1 device:
-  0: Tesla T4 (sm_75, 14.576 GiB / 15.000 GiB available)
+  0: Tesla T4 (sm_75, 14.559 GiB / 15.000 GiB available)
 ```
 
+(These are the versions observed on Ubuntu 22.04 LTS as of October 2026; exact patch
+versions of CUDA.jl and friends may differ slightly on a fresh install, which is fine.)
+
 ## Upload the tutorial notebook
+If you followed tutorial 1, the repo is already cloned on the server (in
+`~/cloudbank_showcase/gpu_computing_oceanography/`) and you can skip this section. If you did
+not clone it, upload the notebook files from your local machine:
+
 1. In Jupyter, click **Upload** in the top right corner
 2. Select the `ocean_gpu_tutorial.ipynb`, `ocean_utils.jl`, and `Project.toml` files from your local machine
 3. Click **Upload** to confirm

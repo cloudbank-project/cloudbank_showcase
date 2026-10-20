@@ -105,8 +105,8 @@ Expected output:
 ```
 CUDA toolchain: 
 - runtime 13.2, artifact installation
-- driver 535.288.1 for 13.2
-- compiler 13.2
+- driver 580.178.4 for 13.2
+- compiler 13.3, artifact installation
 
 CUDA libraries: 
 - CUBLAS: 13.3.0
@@ -115,13 +115,13 @@ CUDA libraries:
 - CUSOLVER: 12.1.0
 - CUSPARSE: 12.7.9
 - CUPTI: 2026.1.0 (API 13.2.0)
-- NVML: 12.0.0+535.288.1
+- NVML: 13.0.0+580.178.4
 
 Julia packages: 
-- CUDA: 5.11.0
-- GPUArrays: 11.4.1
-- GPUCompiler: 1.9.1
-- KernelAbstractions: 0.9.41
+- CUDA: 5.11.3
+- GPUArrays: 11.5.16
+- GPUCompiler: 1.17.1
+- KernelAbstractions: 0.9.45
 - CUDA_Driver_jll: 13.2.0+0
 - CUDA_Compiler_jll: 0.4.2+0
 - CUDA_Runtime_jll: 0.21.0+0
@@ -131,8 +131,11 @@ Toolchain:
 - LLVM: 16.0.6
 
 1 device:
-  0: Tesla T4 (sm_75, 14.576 GiB / 15.000 GiB available)
+  0: Tesla T4 (sm_75, 14.559 GiB / 15.000 GiB available)
 ```
+
+(These are the versions observed on Ubuntu 22.04 LTS as of October 2026; exact patch
+versions of CUDA.jl and friends may differ slightly on a fresh install, which is fine.)
 
 ## Troubleshooting
 
