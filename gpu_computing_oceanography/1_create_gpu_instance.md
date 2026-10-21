@@ -1,5 +1,13 @@
 # 1 - Create a GPU Instance on Google Cloud
 
+> **Why this guide's resources?** This guide builds the cloud side of the tutorial:
+> the CloudBank billing account gets you into your Google Cloud project, Cloud
+> Shell gives you an authenticated `gcloud` terminal with nothing to install, and
+> the Compute Engine GPU VM (1x T4, n1-standard-4, Ubuntu 22.04 LTS, 200 GB pd-ssd)
+> is the machine that will run the simulation. See
+> [0 - The Cloud Resources in This Tutorial](0_cloud_resources_overview.md) for the
+> full resource map.
+
 Goal: Create a GPU-enabled virtual machine instance on Google Cloud Platform to run GPU-accelerated Julia ocean modeling simulations.
 
 ## Prerequisites

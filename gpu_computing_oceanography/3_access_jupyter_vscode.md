@@ -1,5 +1,12 @@
 # 3 - Access with VS Code Remote
 
+> **Why this guide's resources?** Nothing new is created here: VS Code Remote-SSH
+> is a different door into the same GPU VM, using the SSH key stored in the
+> instance metadata. Your laptop only needs VS Code and the Remote-SSH extension,
+> because the Julia, Python and Jupyter tooling installs itself on the VM, where
+> the GPU is. See [0 - The Cloud Resources in This Tutorial](0_cloud_resources_overview.md)
+> for the resource map.
+
 Goal: Use VS Code Remote SSH to connect to your GPU instance and run Jupyter notebooks with full IDE capabilities.
 
 **Advantages of VS Code over browser Jupyter:**

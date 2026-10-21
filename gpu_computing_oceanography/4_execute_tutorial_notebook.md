@@ -1,5 +1,12 @@
 # 4 - Execute the Tutorial Notebook
 
+> **Why this guide's resources?** This guide adds no new cloud resources; it uses
+> what guides 1-3 built: the Jupyter server (or VS Code) on the GPU VM as the
+> interface, and the GPU itself, which CUDA.jl reports so you can confirm the
+> simulation really runs on it. See
+> [0 - The Cloud Resources in This Tutorial](0_cloud_resources_overview.md) for how
+> the pieces fit together.
+
 Goal: Learn how to execute the ocean modeling tutorial notebook in either Jupyter Browser or VS Code, and how to verify that the GPU is correctly detected and utilized.
 
 ## Step 1: Open the Notebook

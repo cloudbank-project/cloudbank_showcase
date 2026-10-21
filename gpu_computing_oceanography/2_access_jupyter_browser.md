@@ -1,5 +1,12 @@
 # 2 - Access Jupyter Notebook via Browser
 
+> **Why this guide's resources?** The Jupyter server runs on the GPU VM because
+> that is where the GPU, driver and packages are; this guide only makes it
+> reachable. One firewall rule opens exactly port 8888 so your browser can
+> connect, and the token in the URL is the only secret between you and the
+> machine. See [0 - The Cloud Resources in This Tutorial](0_cloud_resources_overview.md)
+> for why each piece is there.
+
 Goal: Configure firewall rules and access the Jupyter notebook running on your GPU instance through a web browser. This provides the simplest access method and works in any web browser.
 
 **Advantages of browser-based Jupyter:**
