@@ -1,5 +1,13 @@
 # 1 - Create a GPU Instance on Google Cloud
 
+> **Why this guide's resources?** This guide builds the cloud side of the tutorial:
+> the CloudBank billing account gets you into your Google Cloud project, Cloud
+> Shell gives you an authenticated `gcloud` terminal with nothing to install, and
+> the Compute Engine GPU VM (1x T4, n1-standard-4, Ubuntu 22.04 LTS, 200 GB pd-ssd)
+> is the machine that will run the simulation. See
+> [0 - The Cloud Resources in This Tutorial](0_cloud_resources_overview.md) for the
+> full resource map.
+
 Goal: Create a GPU-enabled virtual machine instance on Google Cloud Platform to run GPU-accelerated Julia ocean modeling simulations.
 
 ## Prerequisites
@@ -42,13 +50,22 @@ I need to create a GPU instance with:
 - Zone: us-west1-b
 - Machine type: n1-standard-4
 - GPU: nvidia-tesla-t4 (1 GPU)
-- Image: ubuntu-2204-lts
+- Image: ubuntu-2204-lts (specify with --image-family)
 - Boot disk: 200GB SSD
 - Maintenance policy: TERMINATE
-- Auto-install NVIDIA drivers via metadata
 
 Please create this instance using gcloud compute instances create.
 ```
+
+> **Image flag:** use `--image-family=ubuntu-2204-lts` in the creation command (not
+> `--image=ubuntu-2204-lts`). On current gcloud (verified with gcloud 587.0.0,
+> October 2026), `--image=ubuntu-2204-lts` no longer resolves image family names and
+> fails with "referenced image resource cannot be found"; `--image-family` is the flag
+> that resolves the family, and it is what Gemini uses above.
+
+Do NOT ask Gemini to enable the `install-nvidia-driver=True` metadata flag. On Ubuntu 22.04
+that flag sets the metadata but does not install a driver (verified: after boot there was no
+`nvidia-smi` and no NVIDIA packages). We install the driver explicitly in Step 5 below.
 
 **Expected Gemini response:**
 ```
@@ -57,18 +74,16 @@ The instance julia-ocean-gpu has been created successfully in us-west1-b.
 I've configured the instance with the following specifications:
  - Machine Type: n1-standard-4 (x86)
  - GPU: 1x nvidia-tesla-t4
- - Image: ubuntu-2204-lts (x86_64). Note that I used the x86 version instead of arm64 because the T4 accelerator and N1 machine family are x86-based.
+ - Image: ubuntu-2204-lts (x86_64, specified with --image-family; resolved to ubuntu-2204-jammy-v20261016). Note that I used the x86 version instead of arm64 because the T4 accelerator and N1 machine family are x86-based.
  - Boot Disk: 200GB SSD (pd-ssd).
- - NVIDIA Drivers: A startup script was added to automatically install the nvidia-driver-535 package.
-
-You can monitor the driver installation progress by checking the serial console output or by SSHing into the instance (gcloud compute ssh julia-ocean-gpu --zone=us-west1-b) and running tail -f /var/log/syslog. Once complete, you can verify the installation with nvidia-smi.
+ - No NVIDIA driver was installed; we will install it with explicit commands in Step 5.
 ```
 
 **Note:** This creates:
 - An Ubuntu 22.04 LTS x86_64 instance with 4 vCPUs and 15 GB RAM
 - One NVIDIA Tesla T4 GPU (16 GB VRAM)
 - 200 GB SSD storage for data and packages
-- Auto-installation of NVIDIA drivers via startup script
+- No NVIDIA driver yet (installed in Step 5 below)
 
 ### Step 4: Verify instance status
 Ask Gemini to check the instance status:
@@ -78,7 +93,40 @@ Please verify that the instance julia-ocean-gpu in zone us-west1-b is running an
 
 You should see the instance status as `RUNNING` with the T4 accelerator attached.
 
-### Step 5: Verify GPU installation
+> **Note:** If you ask Gemini to run `gcloud compute accelerator-types list` to check T4
+> availability, it may crash in Cloud Shell with a Python error
+> (`AttributeError: 'NoneType' object has no attribute 'GetRequestType'`). This is a known
+> gcloud CLI bug in the accelerator-types command; T4 availability is confirmed implicitly
+> by the successful creation of the instance with the GPU attached, so you can skip that check.
+
+### Step 5: Install NVIDIA drivers
+Ask Gemini to install the NVIDIA driver over SSH:
+```
+SSH into the server and install the NVIDIA driver. First run apt-get update, then install the nvidia-driver-535 package, then reboot the server. After the reboot, reconnect and check nvidia-smi.
+```
+
+**Installation commands (run inside the instance):**
+```bash
+sudo apt-get update
+sudo apt-get install -y nvidia-driver-535
+sudo reboot
+```
+
+Wait for the reboot to finish, then reconnect:
+```bash
+gcloud compute ssh julia-ocean-gpu --zone=us-west1-b
+```
+
+> **Note:** On Ubuntu 22.04 the `--metadata=install-nvidia-driver=True` option is NOT
+> sufficient by itself: it only records the metadata flag and does not install a driver
+> (verified live: no NVIDIA packages, no `nvidia-smi` after boot). The explicit
+> `apt install` + reboot above is the reliable path, and it is what this tutorial uses.
+> `nvidia-driver-535` is the current driver package name on Ubuntu 22.04 LTS but the exact
+> version apt delivers may be newer than 535.x (verified October 2026: it installs driver
+> **580.178.04 / CUDA 13.0**). The exact driver version does not matter for the tutorial:
+> CUDA.jl ships its own runtime artifacts, and any 500-series-or-newer driver works.
+
+### Step 6: Verify GPU installation
 Ask Gemini to check the GPU status on the server:
 ```
 Show me the output of nvidia-smi on the server.
@@ -88,16 +136,18 @@ Show me the output of nvidia-smi on the server.
 ```
 I'll check the nvidia-smi output for you.
 
-[... shows nvidia-smi output with Tesla T4 GPU, 15360 MiB memory, CUDA 12.x ...]
+[... shows nvidia-smi output with Tesla T4 GPU, 15360 MiB memory, Driver Version: 580.178.04, CUDA Version: 13.0 ...]
 ```
 
 This confirms:
 - GPU: Tesla T4 detected
 - Driver installed and running
 - 15360 MiB (~15 GB) GPU memory available
-- CUDA Version: 12.x (compatible with CUDA.jl requirements)
+- CUDA Version (max supported by driver): 13.0. This is new enough for CUDA.jl: its
+  toolchain reports runtime 13.2 / driver 580.178.4 inside Julia (see the expected
+  `CUDA.versioninfo()` output in tutorial 2).
 
-### Step 6: Install Julia
+### Step 7: Install Julia
 Ask Gemini to install Julia using Juliaup:
 ```
 SSH into the server and install Julia using Juliaup. First run the curl command to install Juliaup, then add Julia version 1.11 and set it as default.
@@ -111,7 +161,7 @@ juliaup add 1.11
 juliaup default 1.11
 ```
 
-### Step 7: Verify Julia installation
+### Step 8: Verify Julia installation
 Ask Gemini to check the Julia version:
 ```
 Show me the Julia version on the server.
@@ -119,27 +169,32 @@ Show me the Julia version on the server.
 
 Expected output: `julia version 1.11.x`
 
-### Step 8: Install Jupyter
-Ask Gemini to install Jupyter and register the Julia kernel:
+### Step 9: Install Jupyter
+Ask Gemini to install the Jupyter notebook server:
 ```
-SSH into the server and install jupyter-nbconvert via apt, then register the Julia kernel for Jupyter.
+SSH into the server and install the Jupyter notebook server via apt.
 ```
 
 **Installation commands:**
 ```bash
-sudo apt-get install -y jupyter-nbconvert
-julia -e "using IJulia; installkernel(\"Julia\")"
+sudo apt-get install -y jupyter-nbconvert jupyter-notebook
 ```
 
-### Step 9: Prepare the Simulation Environment
+The `jupyter-notebook` package provides the notebook server (version 6.4.8 on Ubuntu 22.04);
+`jupyter-nbconvert` alone is NOT enough because IJulia's `notebook()` command launches the
+notebook server and needs its `notebook` subcommand. We register the Julia kernel in the
+next step, after IJulia is installed (the kernel registration needs the IJulia package, so
+it must come after the Julia package install below).
+
+### Step 10: Prepare the Simulation Environment
 Ask Gemini to clone the repository and install all Julia packages:
 ```
-SSH into the server, clone the showcase repository, then install all required Julia packages globally with the correct versions.
+SSH into the server, clone the showcase repository, then install all required Julia packages globally with the correct versions. After the package install, register the Julia kernel for Jupyter.
 ```
 
 **Commands:**
 ```bash
-git clone https://github.com/zonca/cloudbank_showcase.git
+git clone https://github.com/cloudbank-project/cloudbank_showcase.git
 cd cloudbank_showcase/gpu_computing_oceanography/
 ```
 
@@ -149,7 +204,7 @@ using Pkg
 
 Pkg.add([
     PackageSpec(name="Oceananigans", version="0.99.0"),
-    PackageSpec(name="Reactant"),
+    PackageSpec(name="Reactant", version="0.2.269"),
     PackageSpec(name="Enzyme"),
     PackageSpec(name="CUDA"),
     PackageSpec(name="CairoMakie"),
@@ -163,7 +218,17 @@ Pkg.add([
 Pkg.build("CUDA")
 ```
 
-**Important:** Packages are installed into the **global environment** — do not run `Pkg.activate(".")` before this step. Precompilation will take 15–20 minutes on first run.
+**Reactant version pin:** Reactant is pinned to `0.2.269`, the last release compatible with
+Oceananigans 0.99.0. The newest Reactant release (0.2.295, October 2026) breaks this
+tutorial at the GPU time-step with an `unadapted traced value` kernel-argument error
+(`_check_no_traced_in_kernel_arg`, `ReactantCUDAExt.jl`). Do not install Reactant unpinned.
+
+**Register the Julia kernel (after the package install):**
+```bash
+julia -e "using IJulia; installkernel(\"Julia\")"
+```
+
+**Important:** Packages are installed into the **global environment**; do not run `Pkg.activate(".")` before this step. Precompilation will take 20–25 minutes on first run.
 
 **Expected Gemini response:**
 ```
@@ -171,8 +236,9 @@ The Julia environment on julia-ocean-gpu is now fully set up.
 
 Summary:
  - Project Cloned: ~/cloudbank_showcase/gpu_computing_oceanography
- - Packages installed globally: Oceananigans v0.99.0, Reactant, Enzyme, CUDA, etc.
+ - Packages installed globally: Oceananigans v0.99.0, Reactant v0.2.269, Enzyme, CUDA, etc.
  - CUDA backend rebuilt and verified.
+ - Julia kernel registered for Jupyter.
 
 Important Note: Oceananigans emitted a warning about being tested primarily on Julia v1.10, but it successfully precompiled for your v1.11.9 installation.
 ```
