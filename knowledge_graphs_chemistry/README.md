@@ -8,6 +8,8 @@ A **knowledge graph** solves this problem. It stores every fact as a simple link
 
 This step-by-step guide walks you through setting up a knowledge graph on **Amazon Web Services (AWS)**, from an empty account to running live queries.
 
+**Last Verified:** Oct 2026
+
 ---
 
 ## What You Will Build
