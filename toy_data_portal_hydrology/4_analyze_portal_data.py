@@ -33,7 +33,8 @@ LOCAL_NETCDF = None  # optional local fallback
 # Configure at the top of the notebook:
 # - `PORTAL_BASE`: required unless `LOCAL_NETCDF` is set (inside the cluster use `http://toy-portal.portal.svc.cluster.local`; from outside use the portal external IP like `http://35.x.x.x`).
 # - `LOCAL_NETCDF`: optional local NetCDF path to skip the portal download.
-# - Plot is saved to `plot.png` in the working directory.
+# - Plots are saved as `plot_<variable>.png` in the working directory.
+# - The code uses modern typing (`str | None`), so it requires Python 3.10+; the `scipy-notebook` image used in step 2 ships Python 3.13.
 
 # %%
 import os

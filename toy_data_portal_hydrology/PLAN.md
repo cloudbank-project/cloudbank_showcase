@@ -10,8 +10,8 @@ However, HydroShare is a large and complex platform, with extensive features and
 
 | # | Title | HydroShare URL | Size | Notes |
 |---|---|---|---|---|
-| 1 | CAMELS USGS Streamflow NetCDF from 1980 to 2014 | https://www.hydroshare.org/resource/38f9499d3dbc4e9b95a6256c87460191/ (HydroShare) | 36.6 MB | CAMELS USGS streamflow time series (1980–2014), Multidimensional NetCDF with WGS84 EPSG:4326 coverage over the USA. |
-| 2 | NWM Routelink NetCDF | https://www.hydroshare.org/resource/0a596929a3e5411bb0032a8de35e5089/ (HydroShare) | 256.9 MB | National Water Model RouteLink NetCDF (v2.2.0 domain file), Multidimensional NetCDF with WGS84 EPSG:4326, CONUS-wide spatial coverage. |
+| 1 | CAMELS USGS Streamflow NetCDF from 1980 to 2014 | https://www.hydroshare.org/resource/38f9499d3dbc4e9b95a6256c87460191/ (HydroShare) | 29.6 MB (ZIP) | CAMELS USGS streamflow time series (1980–2014). The downloadable file is `camel_usgs_streamflow.zip` (29,600,360 bytes); the NetCDF lives inside the ZIP, so this resource is not directly uploadable by the portal's NetCDF-only form. Direct download: https://www.hydroshare.org/resource/38f9499d3dbc4e9b95a6256c87460191/data/contents/camel_usgs_streamflow.zip |
+| 2 | NWM Routelink NetCDF | https://www.hydroshare.org/resource/0a596929a3e5411bb0032a8de35e5089/ (HydroShare) | 269.4 MB (256.9 MiB) | National Water Model RouteLink NetCDF (v2.2.0 domain file), `RouteLink_CONUS.nc` (269,366,417 bytes), Multidimensional NetCDF with WGS84 EPSG:4326, CONUS-wide spatial coverage. Direct download: https://www.hydroshare.org/resource/0a596929a3e5411bb0032a8de35e5089/data/contents/RouteLink_CONUS.nc |
 
 ## Metadata handling (toy portal scope)
 
@@ -28,7 +28,7 @@ Small NetCDF samples listed above are enough for testing. Optional future polish
 
 ## Input needed
 
-* 3 input files (tens of MB) in netcdf format with interesting metadata
+* 2 sample datasets (about 30 MB ZIP and 270 MB NetCDF) in netcdf format with interesting metadata
 * Jupyter Notebook in Python
 	* Read one of the NetCDF files
 	* Extract metadata and write them as JSON or another format commonly used in the hydrology community

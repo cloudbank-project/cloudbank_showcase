@@ -1,9 +1,9 @@
 # 2 - Deploy JupyterHub with the Zero to JupyterHub chart
 
-Goal: install JupyterHub on the GKE Autopilot cluster created in step 0, using the official Helm chart from the Zero to JupyterHub project.
+Goal: install JupyterHub on the GKE Autopilot cluster created in step 1, using the official Helm chart from the Zero to JupyterHub project.
 
 ## Prerequisites
-- The `toy-hydro-cluster` from step 0 is Running.
+- The `toy-hydro-cluster` from step 1 is Running.
 - Cloud Shell is open (top bar **Activate Cloud Shell** icon) and connected to the cluster:
   ```bash
   kubectl config current-context
@@ -69,9 +69,10 @@ Notes:
 - Only the user listed in `admin_users` / `allowed_users` can log in. Update those lists if you need others.
 - `userScheduler.enabled: false` is required because GKE Autopilot forbids custom schedulers; we must use the default GKE scheduler.
 - `cloudMetadata.blockWithIptables: false` is required because Autopilot disallows pods that add NET_ADMIN/iptables rules; leaving it `true` would be rejected by Autopilot’s security controls.
-- `networkPolicy.egress` allows the singleuser servers to reach the `portal` namespace (needed for the portal service).
-- `podPriority.enabled: true` lets the chart set higher priority for the hub pods, while disabling the `prePuller.hook` avoids the failing image-puller hook (the chart expected a `jhub-image-puller-priority` class that was not present). The hook only pre-pulls images for speed, so turning it off is safe.
-Dummy authentication is only for this tutorial; change it before exposing to real users. The password generated above is available in `JHUB_PASS` for the session.
+- `networkPolicy.egress` allows the singleuser servers to reach the `portal` namespace (needed for the portal service). The chart merges this rule with its own egress rules (including DNS), so nothing else is blocked.
+- `podPriority.enabled: true` gives the hub pods a defined priority relative to placeholder pods (the chart creates its own priority classes for this). Disabling the `prePuller.hook` skips the pre-upgrade image puller, which only pre-pulls images to nodes for speed and would make `helm upgrade` wait for the pull; turning it off is safe for this demo.
+Dummy authentication is only for this tutorial; change it before exposing to real users. The password generated above is available in `JHUB_PASS` for the session. Note that JupyterHub 5.3+ deprecates `DummyAuthenticator.password` in favor of `SharedPasswordAuthenticator`; it still works on the current chart (which bundles JupyterHub 5.5.4) and is the simplest option for this demo.
+All settings above are validated against the current chart (v4.4.4 as of Oct 2026); if a future chart version rejects a key, check the chart’s `values.yaml` for the replacement.
 
 3) Install or upgrade the release (this pulls the latest chart):
 ```bash
@@ -89,7 +90,7 @@ kubectl -n jhub get pods -w
    ```bash
    kubectl -n jhub get svc proxy-public
    ```
-   Sample output once the IP is assigned:
+   Sample output once the IP is assigned (your cluster IP, external IP and node port will differ):
    ```
    NAME           TYPE           CLUSTER-IP    EXTERNAL-IP    PORT(S)        AGE
    proxy-public   LoadBalancer   10.0.32.123   34.82.10.20    80:30590/TCP   2m
@@ -129,7 +130,7 @@ helm upgrade --install jhub jupyterhub/jupyterhub \
    echo "User: ${JHUB_ADMIN}"
    echo "Pass: ${JHUB_PASS}"
    ```
-    Sign in with any username and that password (the admin username you listed will have admin rights inside JupyterHub). Browsers will label the page "Not Secure" or show a privacy warning because the certificate is self-signed, but the traffic is still encrypted, which is sufficient for this demo scenario.
+    Sign in with the admin username you listed (printed by `echo ${JHUB_ADMIN}`) and that password. Because `allowed_users` restricts access, only that user is authorized to log in, and inside JupyterHub that user has admin rights. Browsers will label the page "Not Secure" or show a privacy warning because the certificate is self-signed, but the traffic is still encrypted, which is sufficient for this demo scenario.
 
 ## Clean up (optional)
 To remove the demo deployment:
