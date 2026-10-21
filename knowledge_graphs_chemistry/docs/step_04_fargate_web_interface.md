@@ -199,7 +199,7 @@ To remove the Fargate service and stop ongoing costs:
 bash scripts/09_destroy_fargate_web_interface.sh
 ```
 
-This removes the ECS service. It does **not** remove supporting resources like the ECR repository, log group, or ECS cluster — delete those manually in the Console if needed.
+This removes the ECS service and the supporting resources the deploy script created for this demo: the Application Load Balancer and target group (if you created them), the ECS cluster, the task definitions, the ECR repository, the log group, and the security groups. Neptune is left untouched.
 
 ---
 

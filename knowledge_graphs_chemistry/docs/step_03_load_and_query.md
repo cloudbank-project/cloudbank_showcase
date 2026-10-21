@@ -17,7 +17,19 @@ Neptune is inside a private network (VPC) and cannot be reached directly from yo
 
 ## 0) Make Sure the Data Is in S3
 
-Before Neptune can load anything, the dataset file must already be in your S3 bucket. If you have not done this yet, go back and run the upload step (see Step 1 and the `scripts/01_download_oregano.sh` / `scripts/02_upload_to_s3.sh` scripts).
+Before Neptune can load anything, the dataset file must already be in your S3 bucket. If you have not done this yet, run the two helper scripts now (from the `knowledge_graphs_chemistry` folder):
+
+```bash
+# 1. Download the OREGANO dataset (creates data/oregano_sample.ttl)
+bash scripts/01_download_oregano.sh
+
+# 2. Create the S3 bucket (if it does not exist) and upload the file
+bash scripts/02_upload_to_s3.sh
+```
+
+The upload script builds the bucket name automatically from your `BUCKET_PREFIX`, account ID, and region (or uses `S3_BUCKET` if you set it in `.env`), then uploads the file to `data/oregano_sample.ttl` inside that bucket.
+
+> **Profile note:** use a profile with S3 permissions (e.g. `export AWS_PROFILE=cloudbank-demo`), and load `.env` first (`set -a && source .env && set +a`) so `AWS_REGION` and `BUCKET_PREFIX` are set.
 
 ---
 
@@ -321,3 +333,13 @@ aws ssm list-command-invocations \
 ## Next Step
 
 If everything worked, move on to **[Step 4: Deploy a Web Interface](step_04_fargate_web_interface.md)** to give non-technical users a browser-based way to query the graph.
+
+## Cleanup (Optional)
+
+If you are done testing and want to stop the demo costs, remove the resources this tutorial created:
+
+```bash
+bash scripts/11_destroy_all_demo_resources.sh
+```
+
+`scripts/11_destroy_all_demo_resources.sh` runs the two cleanup scripts: `scripts/09_destroy_fargate_web_interface.sh` (Step 4 resources) and `scripts/10_destroy_neptune_data_and_runner.sh` (Neptune cluster and instance, EC2 runner, IAM roles, and the demo S3 bucket). Note that Neptune is deleted without a final snapshot and the S3 bucket is deleted with its contents, so only run this when you are sure you no longer need the demo data.

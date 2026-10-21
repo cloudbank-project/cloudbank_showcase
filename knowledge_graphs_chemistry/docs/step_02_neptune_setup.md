@@ -113,10 +113,10 @@ A security group acts as a firewall. You need one that allows traffic on port **
 4. Add an **inbound rule**:
    - Type: Custom TCP
    - Port: `8182`
-   - Source: the security group of your EC2 runner (preferred) or your VPC's CIDR range.
+   - Source: your VPC's CIDR range (this is what the automated scripts in the Shortcut section create).
 5. Leave outbound rules as the default (allow all).
 
-> **Tip:** Using a security group as the "source" instead of a broad IP range is more secure. It means only machines in that specific group can reach Neptune.
+> **Tip:** In Step 3 the EC2 runner is placed in this same security group, so it can already reach Neptune on port 8182. The VPC CIDR source is fine for this demo; a security-group source is more secure if you want to limit access to specific machines.
 
 ---
 

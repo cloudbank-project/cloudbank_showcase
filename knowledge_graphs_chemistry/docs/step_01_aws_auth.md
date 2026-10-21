@@ -31,7 +31,11 @@ Open a terminal, navigate to the project folder, and activate the Python virtual
 
 ```bash
 cd <your-project-folder>/knowledge_graphs_chemistry
+
+# First time only: create the virtual environment and install the Python dependencies
+python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 Verify the AWS CLI is installed:
@@ -41,7 +45,7 @@ which aws        # should print a path like /usr/local/bin/aws
 aws --version     # should show aws-cli/2.x
 ```
 
-If `aws` is not found, install it first — see [.tools/aws/README.md](../.tools/aws/README.md) or the [AWS CLI install guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+If `aws` is not found, install it first — see the [AWS CLI install guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 
 ---
 
@@ -145,7 +149,7 @@ Open `.env` in your editor and fill in at least these two values:
 | Variable | What to set | Example |
 |---|---|---|
 | `AWS_REGION` | The AWS region you are using | `us-west-2` |
-| `BUCKET_PREFIX` | A short name prefix for your S3 bucket | `cloudbank-demo` |
+| `BUCKET_PREFIX` | A short name prefix for your S3 bucket | `cloudbank-biobricks-kg` |
 
 You will fill in these additional values **later**, after creating the infrastructure in Step 2:
 

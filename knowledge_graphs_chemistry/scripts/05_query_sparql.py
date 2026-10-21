@@ -10,9 +10,8 @@ from botocore.credentials import ReadOnlyCredentials
 
 
 DEFAULT_QUERY = """
-PREFIX bio: <http://example.org/bio#>
-SELECT ?compound ?disease WHERE {
-  ?compound bio:treats ?disease .
+SELECT * WHERE {
+  ?s ?p ?o .
 } LIMIT 10
 """.strip()
 
@@ -43,8 +42,11 @@ def sigv4_headers(service, region, url, method, body):
 def main() -> None:
     query = DEFAULT_QUERY
     if len(sys.argv) == 2:
+        # An explicit query file takes precedence over the SPARQL_QUERY env var.
         with open(sys.argv[1], "r", encoding="utf-8") as f:
             query = f.read()
+    else:
+        query = os.getenv("SPARQL_QUERY", query)
 
     region = get_env("AWS_REGION", default="us-west-2")
     endpoint = get_env("NEPTUNE_ENDPOINT")
