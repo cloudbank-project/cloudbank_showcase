@@ -403,3 +403,27 @@ bash scripts/11_destroy_all_demo_resources.sh
 ```
 
 `scripts/11_destroy_all_demo_resources.sh` runs the two cleanup scripts: `scripts/09_destroy_fargate_web_interface.sh` (Step 4 resources) and `scripts/10_destroy_neptune_data_and_runner.sh` (Neptune cluster and instance, EC2 runner, IAM roles, and the demo S3 bucket). Note that Neptune is deleted without a final snapshot and the S3 bucket is deleted with its contents, so only run this when you are sure you no longer need the demo data.
+
+**Teardown is asynchronous.** AWS removes most resources in the background: the Neptune cluster can keep releasing its subnet group after `describe-db-clusters` stops listing it, the ECS tasks keep draining while the cluster refuses deletion, and the VPC endpoints stay in the `deleting` state for a while. The cleanup scripts now wait and retry through this teardown (the Neptune script retries the subnet group deletion as long as the cluster reports it still in use, and it polls the VPC endpoints before deleting their security group), and they only print `cleanup complete (verified)` after re-checking every resource with `describe`. Allow several minutes on the first run.
+
+**The scripts are safe to re-run.** If a script prints a WARNING and exits non-zero (meaning teardown was still in progress), wait a few minutes and run `bash scripts/11_destroy_all_demo_resources.sh` again; the re-run completes any leftover. The scripts never delete a resource that does not carry the `cloudbank-demo-created=true` tag, so a pre-existing resource with the same name is left untouched (a `Skipping ... pre-existing` note is printed instead).
+
+**Verify before declaring clean.** After the scripts finish, these commands should all return no output:
+
+```bash
+# ECS cluster from Step 4 (an INACTIVE record is fine; AWS removes it by itself)
+aws ecs describe-clusters --region "$AWS_REGION" --clusters "${ECS_CLUSTER:-cloudbank-chemistry-ui-cluster}"
+# Neptune cluster, instance and subnet group from Steps 2-3
+aws neptune describe-db-clusters --region "$AWS_REGION"
+aws neptune describe-db-instances --region "$AWS_REGION"
+aws neptune describe-db-subnet-groups --region "$AWS_REGION"
+# Tutorial VPC endpoints (both the S3 gateway and the STS interface endpoint)
+aws ec2 describe-vpc-endpoints --region "$AWS_REGION"
+# Tutorial security groups (a pre-existing group with the same name is expected to remain)
+aws ec2 describe-security-groups --region "$AWS_REGION" --filters "Name=group-name,Values=neptune-demo-sg,cloudbank-sts-endpoint-sg"
+# EC2 runner and the demo S3 bucket
+aws ec2 describe-instances --region "$AWS_REGION" --filters "Name=tag:Name,Values=cloudbank-neptune-runner" "Name=instance-state-name,Values=pending,running,stopping,stopped,shutting-down"
+aws s3api list-buckets --region "$AWS_REGION" --query 'Buckets[?contains(Name, `cloudbank-biobricks-kg`)].Name'
+```
+
+Expected: `describe-db-clusters`, `describe-db-instances`, `describe-db-subnet-groups`, `describe-vpc-endpoints` and `describe-instances` print nothing, and the security group filter shows nothing for the two tutorial groups. The remaining checks (Step 4 load balancer, target group, ECR repository and log group) are listed in the [Step 4 cleanup section](step_04_fargate_web_interface.md#7-clean-up).

@@ -203,6 +203,29 @@ This removes the ECS service and the supporting resources the deploy script crea
 
 **Safety note:** the cleanup scripts only delete resources that carry the tag `cloudbank-demo-created=true`, which the setup and deploy scripts add to everything they create. If a security group or IAM role with one of the tutorial names already existed before you started (for example from an earlier run or another workload), the scripts print `Skipping ... pre-existing` and leave it untouched. The role `ecsTaskExecutionRole` is only deleted when this tutorial created it and no ECS cluster still uses it.
 
+**Teardown is asynchronous.** Fargate stops the running tasks in the background, so the cluster can refuse deletion for a few minutes. The script now scales the service to zero, waits until the task list is empty, retries `DeleteCluster` (up to 10 times, 20 seconds apart), and re-checks every resource with `describe` before printing `Fargate web interface cleanup complete (verified)`. Allow several minutes on the first run.
+
+**The script is safe to re-run.** If it prints a WARNING and exits non-zero (teardown was still in progress, for example the cluster is still ACTIVE), wait a few minutes and run it again; the re-run completes any leftover.
+
+**Verify before declaring clean.** The commands below should all return no output when cleanup has finished:
+
+```bash
+aws ecs describe-clusters --region "$AWS_REGION" --clusters "${ECS_CLUSTER:-cloudbank-chemistry-ui-cluster}"
+aws ecs describe-services --region "$AWS_REGION" --cluster "${ECS_CLUSTER:-cloudbank-chemistry-ui-cluster}" --services "${ECS_SERVICE:-cloudbank-chemistry-ui-service}"
+aws elbv2 describe-load-balancers --region "$AWS_REGION" --names "${ALB_NAME:-cloudbank-chemistry-ui-alb}"
+aws elbv2 describe-target-groups --region "$AWS_REGION" --names "${TG_NAME:-cloudbank-chemistry-ui-tg}"
+aws ecr describe-repositories --region "$AWS_REGION" --repository-names "${ECR_REPO:-cloudbank-chemistry-ui}"
+aws logs describe-log-groups --region "$AWS_REGION" --log-group-name-prefix "/ecs/${APP_NAME:-cloudbank-chemistry-ui}"
+aws ec2 describe-security-groups --region "$AWS_REGION" --filters "Name=group-name,Values=${UI_SG_NAME:-cloudbank-chemistry-ui-sg},${ALB_SG_NAME:-cloudbank-chemistry-ui-alb-sg}"
+```
+
+Notes:
+
+- The load balancer and target group commands apply only if you created them in [Section 8](#8-optional-get-a-stable-url-with-a-load-balancer).
+- An `INACTIVE` ECS cluster record is fine; AWS removes it by itself.
+- The security group commands show nothing for the tutorial groups. A pre-existing group with the same name is never deleted, so it still appears, and that is expected.
+- If you also ran the Step 3 cleanup (script `10`), `aws neptune describe-db-clusters`, `aws neptune describe-db-instances` and `aws ec2 describe-vpc-endpoints` must also return nothing; the full list is in the [Step 3 cleanup section](step_03_load_and_query.md#cleanup-optional).
+
 ---
 
 ## 8) (Optional) Get a Stable URL with a Load Balancer
