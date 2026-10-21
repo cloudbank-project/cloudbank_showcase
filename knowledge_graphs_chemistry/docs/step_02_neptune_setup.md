@@ -40,6 +40,8 @@ aws neptune wait db-instance-available \
 
 These scripts auto-detect your default VPC and subnets, create the S3 gateway endpoint, and write `NEPTUNE_ENDPOINT` and `NEPTUNE_IAM_ROLE_ARN` into your `.env` file.
 
+The scripts create the Neptune instance with class `db.r5.large` by default (the class recommended for this dataset, see the Goal section below). If you want a cheaper smaller class anyway, override it: `NEPTUNE_INSTANCE_CLASS=db.t3.medium bash scripts/07_create_neptune_cluster.sh`.
+
 `scripts/07_create_neptune_cluster.sh` prints an explicit result for the role association: either `Role is associated to cluster` or a warning with the exact command to re-run if the role was not attached yet (this only happens rarely, when IAM propagation lags the cluster readiness).
 
 If you use the scripts, skip to [Section 7 — Verify](#7-verify-everything-is-ready) to confirm it worked.
@@ -53,10 +55,12 @@ By the end of this step you have:
 | Resource | Value |
 |---|---|
 | Neptune cluster | `cloudbank-biobricks-neptune` in `us-west-2` |
-| Database instance | `db.t3.medium` or `db.t4g.medium`, status = Available |
+| Database instance | `db.r5.large` (2 vCPU, 16 GiB RAM), status = Available |
 | Security group | Allows inbound TCP on port `8182` from your private network |
 | IAM role | `NeptuneLoadFromS3Role` with S3 read access |
 | `.env` updated | `NEPTUNE_ENDPOINT` and `NEPTUNE_IAM_ROLE_ARN` filled in |
+
+> **Why `db.r5.large`?** The full OREGANO file is large (about 114 MB, over 3 million triples), and a small instance class can run out of memory during the bulk load in Step 3, failing with `OUT_OF_MEMORY_ERROR` before the data is imported. `db.r5.large` (2 vCPU, 16 GiB) has 4 times the memory of `db.t3.medium` and loads the file reliably in about 10 minutes. It costs a few tens of cents per hour while it is running, and only for the hours the database exists (see the Amazon Neptune pricing page for the exact rate in your region). Smaller classes such as `db.t3.medium` or `db.t4g.medium` may still work, but they can hit out-of-memory on the full dataset.
 
 ---
 
@@ -129,7 +133,7 @@ A security group acts as a firewall. You need one that allows traffic on port **
 1. Open **Amazon Neptune** → **Databases** → **Create database**.
 2. Engine: **Neptune**.
 3. Cluster identifier: `cloudbank-biobricks-neptune`.
-4. Instance class: `db.t3.medium` (or `db.t4g.medium`) — sufficient for this demo.
+4. Instance class: `db.r5.large` (2 vCPU, 16 GiB). The smaller `db.t3.medium` and `db.t4g.medium` classes are cheaper but can run out of memory during the bulk load in Step 3, so this demo uses `db.r5.large`.
 5. DB subnet group: `neptune-demo-subnet-group`.
 6. VPC security group: `neptune-demo-sg`.
 7. IAM DB authentication: **Enable**.

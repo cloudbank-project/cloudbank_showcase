@@ -264,11 +264,13 @@ loadId: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 **Save this `loadId`** — you will use it to check progress in the next section.
 
+A fresh load of the full OREGANO file (about 3.4 million triples) takes about 10 minutes on the `db.r5.large` instance recommended in Step 2. If the load fails within seconds, see [Section 5 Troubleshooting](#5-troubleshooting): on small instance classes the most likely cause is the database running out of memory.
+
 ---
 
 ## 3) Monitor the Load
 
-Loading millions of triples takes a few minutes. You can check progress by querying Neptune's loader status endpoint.
+Loading about 3.4 million triples takes about 10 minutes on the `db.r5.large` instance from Step 2. You can check progress by querying Neptune's loader status endpoint.
 
 First, set your load ID:
 
@@ -387,6 +389,8 @@ aws ssm list-command-invocations \
 | SSM command returns "failed" | Runner instance is not registered with SSM yet, or missing dependencies | 1. Wait longer in the SSM polling loop. 2. Ensure `pip3 install boto3 requests` was successful on the runner. |
 | Query times out | Running from your laptop instead of the runner | Use the SSM approach above — Neptune is only reachable from inside the VPC |
 | Load status shows `LOAD_FAILED` with parse errors | Corrupted or incomplete data file | Re-download and re-upload the `.ttl` file, then retry the load |
+| Load fails within seconds with `insertErrors` and status `LOAD_UNEXPECTED_ERROR` or `LOAD_FAILED` | The database instance ran out of memory (`OUT_OF_MEMORY_ERROR` in the loader error log) | 1. Retry the load (Neptune may succeed on the next attempt). 2. If it keeps failing, delete and recreate the cluster using `db.r5.large` (see [Step 2](step_02_neptune_setup.md)) and reload. |
+| Load status shows `Out of memory error. Resume load and try again.` | The database instance lacks enough memory for the whole file; on a small class such as `db.t3.medium` (4 GiB) the full OREGANO file hits this within seconds | 1. Rerun the load: the loader resumes from where it stopped, and records already imported are skipped. 2. To confirm the cause, read the load status output from Section 3: the `errors.errorLogs` entries list an `errorCode` (here `OUT_OF_MEMORY_ERROR`) and an `errorMessage` for each failed chunk. 3. If the error keeps appearing, delete and recreate the cluster using `db.r5.large` (see [Step 2](step_02_neptune_setup.md)), which has 16 GiB and loads the full file in about 10 minutes, then reload. |
 
 ---
 

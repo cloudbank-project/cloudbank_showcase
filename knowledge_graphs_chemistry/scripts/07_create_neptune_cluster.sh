@@ -5,7 +5,11 @@ export AWS_PROFILE="${AWS_PROFILE:-cloudbank-demo-admin}"
 AWS_REGION="${AWS_REGION:-us-west-2}"
 NEPTUNE_CLUSTER_ID="${NEPTUNE_CLUSTER_ID:-cloudbank-biobricks-neptune}"
 NEPTUNE_INSTANCE_ID="${NEPTUNE_INSTANCE_ID:-cloudbank-biobricks-neptune-1}"
-NEPTUNE_INSTANCE_CLASS="${NEPTUNE_INSTANCE_CLASS:-db.t3.medium}"
+# db.r5.large is the default: the full OREGANO file (about 3.4 million triples)
+# can push small classes (db.t3.medium / db.t4g.medium, 4 GiB) out of memory and
+# the bulk load in Step 3 then fails with OUT_OF_MEMORY_ERROR. Override with
+# NEPTUNE_INSTANCE_CLASS if you prefer a smaller class.
+NEPTUNE_INSTANCE_CLASS="${NEPTUNE_INSTANCE_CLASS:-db.r5.large}"
 NEPTUNE_SUBNET_GROUP="${NEPTUNE_SUBNET_GROUP:-neptune-demo-subnet-group}"
 NEPTUNE_SG_NAME="${NEPTUNE_SG_NAME:-neptune-demo-sg}"
 
@@ -153,7 +157,7 @@ if ! aws neptune describe-db-instances --db-instance-identifier "${NEPTUNE_INSTA
     --engine neptune \
     --db-cluster-identifier "${NEPTUNE_CLUSTER_ID}" \
     --region "${AWS_REGION}" >/dev/null
-  echo "Creating Neptune instance: ${NEPTUNE_INSTANCE_ID}"
+  echo "Creating Neptune instance: ${NEPTUNE_INSTANCE_ID} (class ${NEPTUNE_INSTANCE_CLASS})"
 else
   echo "Neptune instance exists: ${NEPTUNE_INSTANCE_ID}"
 fi
