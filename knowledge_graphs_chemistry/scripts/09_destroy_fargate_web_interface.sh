@@ -13,6 +13,17 @@ TG_NAME="${TG_NAME:-cloudbank-chemistry-ui-tg}"
 UI_SG_NAME="${UI_SG_NAME:-cloudbank-chemistry-ui-sg}"
 ALB_SG_NAME="${ALB_SG_NAME:-cloudbank-chemistry-ui-alb-sg}"
 
+# Marker tag: security groups created by this tutorial carry
+# cloudbank-demo-created=true. Cleanup only deletes tagged groups, so a
+# pre-existing group with the same name is never touched (a note is printed).
+MARKER_KEY="cloudbank-demo-created"
+
+sg_has_marker() {
+  local tags
+  tags="$(aws ec2 describe-security-groups --region "${AWS_REGION}" --group-ids "$1" --query 'SecurityGroups[0].Tags' --output text 2>/dev/null || true)"
+  [[ "${tags}" == *"${MARKER_KEY}"* ]]
+}
+
 if [[ -f .env ]]; then
   set -a
   source .env
@@ -77,10 +88,18 @@ if [[ -n "$UI_SG_ID" && "$UI_SG_ID" != "None" ]]; then
 fi
 
 if [[ -n "$ALB_SG_ID" && "$ALB_SG_ID" != "None" ]]; then
-  aws ec2 delete-security-group --region "$AWS_REGION" --group-id "$ALB_SG_ID" >/dev/null 2>&1 || true
+  if sg_has_marker "$ALB_SG_ID"; then
+    aws ec2 delete-security-group --region "$AWS_REGION" --group-id "$ALB_SG_ID" >/dev/null 2>&1 || true
+  else
+    echo "Skipping security group $ALB_SG_ID ($ALB_SG_NAME, pre-existing, not created by this tutorial)."
+  fi
 fi
 if [[ -n "$UI_SG_ID" && "$UI_SG_ID" != "None" ]]; then
-  aws ec2 delete-security-group --region "$AWS_REGION" --group-id "$UI_SG_ID" >/dev/null 2>&1 || true
+  if sg_has_marker "$UI_SG_ID"; then
+    aws ec2 delete-security-group --region "$AWS_REGION" --group-id "$UI_SG_ID" >/dev/null 2>&1 || true
+  else
+    echo "Skipping security group $UI_SG_ID ($UI_SG_NAME, pre-existing, not created by this tutorial)."
+  fi
 fi
 
 echo "Fargate web interface cleanup complete."

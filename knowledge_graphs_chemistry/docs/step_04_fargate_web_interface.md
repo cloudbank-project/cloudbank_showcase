@@ -201,6 +201,8 @@ bash scripts/09_destroy_fargate_web_interface.sh
 
 This removes the ECS service and the supporting resources the deploy script created for this demo: the Application Load Balancer and target group (if you created them), the ECS cluster, the task definitions, the ECR repository, the log group, and the security groups. Neptune is left untouched.
 
+**Safety note:** the cleanup scripts only delete resources that carry the tag `cloudbank-demo-created=true`, which the setup and deploy scripts add to everything they create. If a security group or IAM role with one of the tutorial names already existed before you started (for example from an earlier run or another workload), the scripts print `Skipping ... pre-existing` and leave it untouched. The role `ecsTaskExecutionRole` is only deleted when this tutorial created it and no ECS cluster still uses it.
+
 ---
 
 ## 8) (Optional) Get a Stable URL with a Load Balancer
@@ -247,7 +249,9 @@ ALB_SG_ID=$(aws ec2 describe-security-groups --region "$AWS_REGION" \
 if [ -z "$ALB_SG_ID" ] || [ "$ALB_SG_ID" = "None" ]; then
   ALB_SG_ID=$(aws ec2 create-security-group --region "$AWS_REGION" \
     --group-name "$ALB_SG_NAME" --description "ALB SG for chemistry UI" \
-    --vpc-id "$VPC_ID" --query 'GroupId' --output text)
+    --vpc-id "$VPC_ID" \
+    --tag-specifications 'ResourceType=security-group,Tags=[{Key=cloudbank-demo-created,Value=true}]' \
+    --query 'GroupId' --output text)
 fi
 aws ec2 authorize-security-group-ingress --region "$AWS_REGION" \
   --group-id "$ALB_SG_ID" --protocol tcp --port 80 --cidr 0.0.0.0/0 >/dev/null 2>&1 || true

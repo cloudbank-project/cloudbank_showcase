@@ -71,18 +71,24 @@ export SUBNET_ID="${SUBNET_ID:-$(aws ec2 describe-subnets --region "$AWS_REGION"
   --query 'Subnets[0].SubnetId' --output text)}"
 
 # Create IAM role + instance profile so SSM can manage the instance
-aws iam create-role \
-  --role-name CloudbankDemoEc2Role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
-  >/dev/null 2>&1 || true
+# (the cloudbank-demo-created tag lets the cleanup scripts recognize them)
+if ! aws iam get-role --role-name CloudbankDemoEc2Role >/dev/null 2>&1; then
+  aws iam create-role \
+    --role-name CloudbankDemoEc2Role \
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
+fi
 
 aws iam attach-role-policy --role-name CloudbankDemoEc2Role \
   --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore >/dev/null 2>&1 || true
 aws iam attach-role-policy --role-name CloudbankDemoEc2Role \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess >/dev/null 2>&1 || true
 
-aws iam create-instance-profile \
-  --instance-profile-name CloudbankDemoEc2Profile >/dev/null 2>&1 || true
+if ! aws iam get-instance-profile --instance-profile-name CloudbankDemoEc2Profile >/dev/null 2>&1; then
+  aws iam create-instance-profile \
+    --instance-profile-name CloudbankDemoEc2Profile \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
+fi
 aws iam add-role-to-instance-profile \
   --instance-profile-name CloudbankDemoEc2Profile \
   --role-name CloudbankDemoEc2Role >/dev/null 2>&1 || true
@@ -101,18 +107,32 @@ AMI_ID="$(aws ec2 describe-images --owners amazon --region "$AWS_REGION" \
   --query 'Images | sort_by(@,&CreationDate)[-1].ImageId' \
   --output text)"
 
-# Launch the instance
-RUNNER_INSTANCE_ID="$(aws ec2 run-instances \
-  --region "$AWS_REGION" \
-  --image-id "$AMI_ID" \
-  --instance-type t3.micro \
-  --iam-instance-profile Name=CloudbankDemoEc2Profile \
-  --security-group-ids "$NEPTUNE_SG_ID" \
-  --subnet-id "$SUBNET_ID" \
-  --associate-public-ip-address \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=cloudbank-neptune-runner}]' \
-  --query 'Instances[0].InstanceId' \
-  --output text)"
+# Launch the instance. Right after creating the IAM role and instance profile,
+# EC2 can reject the profile name with "Invalid IAM Instance Profile name" until
+# IAM changes propagate across AWS (usually under a minute), so retry a few times.
+RUNNER_INSTANCE_ID=""
+for attempt in 1 2 3; do
+  RUNNER_INSTANCE_ID="$(aws ec2 run-instances \
+    --region "$AWS_REGION" \
+    --image-id "$AMI_ID" \
+    --instance-type t3.micro \
+    --iam-instance-profile Name=CloudbankDemoEc2Profile \
+    --security-group-ids "$NEPTUNE_SG_ID" \
+    --subnet-id "$SUBNET_ID" \
+    --associate-public-ip-address \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=cloudbank-neptune-runner}]' \
+    --query 'Instances[0].InstanceId' \
+    --output text 2>/dev/null || true)"
+  if [[ -n "$RUNNER_INSTANCE_ID" && "$RUNNER_INSTANCE_ID" != "None" ]]; then
+    echo "Runner created on attempt $attempt: $RUNNER_INSTANCE_ID"
+    break
+  fi
+  echo "Attempt $attempt to launch the runner failed (IAM propagation). Retrying in 30 s..."
+  sleep 30
+done
+if [[ -z "$RUNNER_INSTANCE_ID" || "$RUNNER_INSTANCE_ID" == "None" ]]; then
+  echo "Could not launch the runner. Wait one minute, then run this launch block again." >&2
+fi
 
 echo "RUNNER_INSTANCE_ID=$RUNNER_INSTANCE_ID"
 ```
@@ -143,6 +163,44 @@ aws ssm send-command \
 ```
 
 When SSM status shows `Online` and dependencies are installed, the runner is ready.
+
+### Recommended: check the Neptune certificate before loading
+
+Neptune serves a TLS certificate on port 8182. On rare occasions a brand-new cluster is assigned a certificate whose validity period has already ended; every TLS connection then fails with `certificate has expired` (the loader, curl, and Python clients are all affected). There is no way to rotate the certificate, so do a 10-second check before the first load.
+
+Run this on the runner (the endpoint is only reachable from inside the VPC):
+
+```bash
+export AWS_PROFILE=cloudbank-demo-admin
+set -a && source .env && set +a
+
+CERT_CMD="openssl s_client -connect ${NEPTUNE_ENDPOINT}:8182 -servername ${NEPTUNE_ENDPOINT} -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates"
+CERT_CMD_B64=$(printf '%s' "$CERT_CMD" | base64 -w0)
+
+CERT_CHECK_ID="$(aws ssm send-command \
+  --region "$AWS_REGION" \
+  --instance-ids "$RUNNER_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --parameters "commands=[\"echo $CERT_CMD_B64 | base64 -d | bash\"]" \
+  --query 'Command.CommandId' \
+  --output text)"
+
+aws ssm list-command-invocations \
+  --region "$AWS_REGION" \
+  --command-id "$CERT_CHECK_ID" \
+  --details \
+  --query 'CommandInvocations[0].CommandPlugins[0].Output' \
+  --output text
+```
+
+The output looks like:
+
+```
+notBefore=Jul 27 00:00:00 2026 GMT
+notAfter=Feb  9 23:59:59 2027 GMT
+```
+
+If `notAfter` is in the past, or the output says `certificate has expired`, stop here and follow the troubleshooting row below (delete and recreate the cluster). With a valid certificate, the load and query steps that follow work without changes.
 
 ---
 
@@ -322,6 +380,8 @@ aws ssm list-command-invocations \
 
 | Problem | Likely cause | Fix |
 |---|---|---|
+| Load or curl fails with `certificate has expired` (`SSLCertVerificationError`, curl exit 60) | The cluster was assigned an expired TLS certificate at creation (rare) | 1. Confirm with the certificate check above. 2. Delete and recreate the cluster: run `bash scripts/10_destroy_neptune_data_and_runner.sh` (this also deletes the runner and the demo S3 bucket), then `bash scripts/07_create_neptune_cluster.sh`, then re-check the certificate. 3. If the recreated cluster still serves an expired certificate, contact AWS support or open a support case. Do not disable TLS verification to work around it. |
+| `InvalidParameterValue: Value (CloudbankDemoEc2Profile) for parameter iamInstanceProfile.name is invalid. Invalid IAM Instance Profile name` | IAM changes (role or profile) have not propagated to EC2 yet, usually right after creation | Wait about 30 seconds and run the launch block again. The launch block in Section 1 retries this automatically in 30 s intervals. |
 | Load fails with "Couldn't find the aws credential for iam_role_arn" | IAM role is not associated with the Neptune cluster, **or** the VPC is missing an STS endpoint | 1. Associate the role: `aws neptune add-role-to-db-cluster --db-cluster-identifier cloudbank-biobricks-neptune --role-arn $NEPTUNE_IAM_ROLE_ARN --region $AWS_REGION` 2. Verify an STS interface endpoint (`com.amazonaws.us-west-2.sts`) exists in the VPC with private DNS enabled |
 | Load fails with "Access Denied" to S3 | The IAM role lacks permissions or the bucket name is wrong | 1. Check `NeptuneLoadFromS3Role` has S3 read access. 2. Verify `S3_BUCKET` in `.env` is correct. |
 | SSM command returns "failed" | Runner instance is not registered with SSM yet, or missing dependencies | 1. Wait longer in the SSM polling loop. 2. Ensure `pip3 install boto3 requests` was successful on the runner. |

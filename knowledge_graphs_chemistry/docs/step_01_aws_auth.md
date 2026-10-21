@@ -53,6 +53,8 @@ If `aws` is not found, install it first — see the [AWS CLI install guide](http
 
 A **profile** stores your credentials (access key + secret) so you do not have to type them every time.
 
+> **User name vs profile name:** the profile is a local alias. The AWS IAM **user** that backs it is named `cloudbank-demo-user` for this tutorial, and the profile `cloudbank-demo` maps to that user. If `cloudbank-demo-user` already exists in your account (common on shared or pre-created accounts), reuse it: skip the create steps and just create a fresh access key for it. Only create the user (with that exact name) on a brand-new account.
+
 Run:
 
 ```bash
@@ -74,7 +76,7 @@ Then activate the profile for your current terminal session:
 export AWS_PROFILE=cloudbank-demo
 ```
 
-> **Where do I get an access key?** Log into the [AWS Console](https://console.aws.amazon.com/) → IAM → Users → your user → Security credentials → Create access key.
+> **Where do I get an access key?** Log into the [AWS Console](https://console.aws.amazon.com/) → IAM → Users → your user → Security credentials → Create access key. You can create a new key on an existing user at any time; the old key keeps working unless you deactivate it.
 
 > **CloudBank users:** request billing access at <https://www.cloudbank.org/billing-account-access> first.
 
@@ -90,6 +92,8 @@ Later steps create infrastructure (networks, databases, IAM roles) that require 
 | `cloudbank-demo-admin` | One-time setup (create VPC, Neptune, IAM roles) |
 
 ### Create the admin user in the AWS Console
+
+> **Skip if it exists:** if an IAM user named `cloudbank-demo-admin` already exists in your account, skip the create steps below and go straight to **Security credentials** → **Create access key** for that user (a new key is fine alongside an old one).
 
 1. Open **IAM** → **Users** → **Create user**.
 2. Username: `cloudbank-demo-admin`.

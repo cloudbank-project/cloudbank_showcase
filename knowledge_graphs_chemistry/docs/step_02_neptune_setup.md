@@ -27,16 +27,20 @@ set -a && source .env && set +a
 # 1. Create the IAM role that lets Neptune read from S3
 bash scripts/06_create_neptune_load_role.sh
 
-# 2. Create the VPC networking, Neptune cluster, and instance
+# 2. Create the VPC networking, Neptune cluster, and instance.
+#    This script waits until the instance is Available (5-15 minutes),
+#    then attaches the IAM role to the cluster and verifies the result.
 bash scripts/07_create_neptune_cluster.sh
 
-# 3. Wait until the database instance is ready (can take several minutes)
+# 3. Confirm the database instance is ready (returns immediately after step 2)
 aws neptune wait db-instance-available \
   --db-instance-identifier cloudbank-biobricks-neptune-1 \
   --region us-west-2
 ```
 
 These scripts auto-detect your default VPC and subnets, create the S3 gateway endpoint, and write `NEPTUNE_ENDPOINT` and `NEPTUNE_IAM_ROLE_ARN` into your `.env` file.
+
+`scripts/07_create_neptune_cluster.sh` prints an explicit result for the role association: either `Role is associated to cluster` or a warning with the exact command to re-run if the role was not attached yet (this only happens rarely, when IAM propagation lags the cluster readiness).
 
 If you use the scripts, skip to [Section 7 — Verify](#7-verify-everything-is-ready) to confirm it worked.
 
@@ -147,6 +151,15 @@ Neptune does not use **your** credentials to read from S3. Instead, it **assumes
 5. Role name: `NeptuneLoadFromS3Role`.
 6. Click **Create role** and copy the role's ARN (e.g., `arn:aws:iam::123456789012:role/NeptuneLoadFromS3Role`).
 
+Then attach the role to the cluster. Do this only after the cluster status is **Available**; adding it while the cluster is still `creating` fails silently:
+
+```bash
+aws neptune add-role-to-db-cluster \
+  --region us-west-2 \
+  --db-cluster-identifier cloudbank-biobricks-neptune \
+  --role-arn arn:aws:iam::<your-account-id>:role/NeptuneLoadFromS3Role
+```
+
 ---
 
 ### 6) Update Your `.env` File
@@ -188,6 +201,39 @@ aws iam get-role \
 
 If both return values, you are ready for Step 3.
 
+### Check the role is attached to the cluster
+
+The bulk loader uses the role only when it is attached to the cluster. The shortcut script does this automatically after the instance is Available; on the manual path you ran the attachment command in Section 5:
+
+```bash
+aws neptune describe-db-clusters \
+  --region us-west-2 \
+  --db-cluster-identifier cloudbank-biobricks-neptune \
+  --query 'DBClusters[0].AssociatedRoles' \
+  --output text
+```
+
+If this prints your role ARN, the load role is attached. If it prints nothing, run the attachment command from Section 5 again (the cluster status must be **Available**).
+
+### Check the TLS certificate is valid (pre-check)
+
+Neptune serves a TLS certificate on port 8182. On rare occasions a brand-new cluster is assigned a certificate whose validity period has already ended, and then every TLS connection fails with `certificate has expired` (the bulk loader, curl, and Python clients are all affected). There is no console option or API to rotate the certificate, so it is worth checking before the first load.
+
+The endpoint is only reachable from inside the VPC, so you run this command on the small EC2 runner that Step 3 creates, right before the bulk load (Step 3 shows how to send it to the runner):
+
+```bash
+openssl s_client -connect $NEPTUNE_ENDPOINT:8182 -servername $NEPTUNE_ENDPOINT -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates
+```
+
+The output looks like:
+
+```
+notBefore=Jul 27 00:00:00 2026 GMT
+notAfter=Feb  9 23:59:59 2027 GMT
+```
+
+If `notAfter` is in the past (or the command reports `certificate has expired`), see [Step 3 Troubleshooting](step_03_load_and_query.md): delete and recreate the cluster, or contact AWS support. With a valid certificate, the documented load and query steps work without any changes.
+
 ---
 
 ## Troubleshooting
@@ -197,4 +243,4 @@ If both return values, you are ready for Step 3.
 | `AccessDenied` when creating resources | Wrong profile | Run `export AWS_PROFILE=cloudbank-demo-admin` |
 | Neptune endpoint is empty | Cluster is still provisioning | Wait a few minutes and re-run the describe command |
 | IAM role ARN missing | Role was not created | Go back to Section 5 and create it |
-| Loader later says "can't find credential for iam_role_arn" | Role is not associated with Neptune **or** STS endpoint missing in VPC | Associate the role: `aws neptune add-role-to-db-cluster ...` and create an STS interface endpoint (`com.amazonaws.us-west-2.sts`) in the VPC |
+| Loader later says "can't find credential for iam_role_arn" | Role is not attached to Neptune **or** the STS endpoint is missing in the VPC | Attach the role while the cluster is **Available**: `aws neptune add-role-to-db-cluster ...` (verify with the check in Section 7) and create an STS interface endpoint (`com.amazonaws.us-west-2.sts`) in the VPC |
