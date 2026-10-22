@@ -47,12 +47,6 @@ const TUTORIALS = [
     sourceDir: 'knowledge_graphs_chemistry',
     fileBaseDir: 'docs',
     stripDocsPrefix: true,
-    linkRewrites: [
-      {
-        from: '[.tools/aws/README.md](../.tools/aws/README.md)',
-        to: '[AWS CLI installation guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)',
-      },
-    ],
     files: [
       { from: 'README.md', title: 'Overview', position: 0 },
       { from: 'docs/step_01_aws_auth.md', title: 'Step 1. Connect Your Terminal to AWS', position: 1 },

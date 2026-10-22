@@ -5,9 +5,19 @@ export AWS_PROFILE="${AWS_PROFILE:-cloudbank-demo-admin}"
 AWS_REGION="${AWS_REGION:-us-west-2}"
 NEPTUNE_CLUSTER_ID="${NEPTUNE_CLUSTER_ID:-cloudbank-biobricks-neptune}"
 NEPTUNE_INSTANCE_ID="${NEPTUNE_INSTANCE_ID:-cloudbank-biobricks-neptune-1}"
-NEPTUNE_INSTANCE_CLASS="${NEPTUNE_INSTANCE_CLASS:-db.t3.medium}"
+# db.r5.large is the default: the full OREGANO file (about 3.4 million triples)
+# can push small classes (db.t3.medium / db.t4g.medium, 4 GiB) out of memory and
+# the bulk load in Step 3 then fails with OUT_OF_MEMORY_ERROR. Override with
+# NEPTUNE_INSTANCE_CLASS if you prefer a smaller class.
+NEPTUNE_INSTANCE_CLASS="${NEPTUNE_INSTANCE_CLASS:-db.r5.large}"
 NEPTUNE_SUBNET_GROUP="${NEPTUNE_SUBNET_GROUP:-neptune-demo-subnet-group}"
 NEPTUNE_SG_NAME="${NEPTUNE_SG_NAME:-neptune-demo-sg}"
+
+# Marker tag: applied to every resource this script creates, so the cleanup
+# scripts (09/10) only ever delete what the tutorial created and never a
+# pre-existing resource that happens to share the same name.
+DEMO_TAG_SPEC='ResourceType=security-group,Tags=[{Key=cloudbank-demo-created,Value=true}]'
+DEMO_TAG_SPEC_ENDPOINT='ResourceType=vpc-endpoint,Tags=[{Key=cloudbank-demo-created,Value=true}]'
 
 VPC_ID="${VPC_ID:-$(aws ec2 describe-vpcs --region "${AWS_REGION}" --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)}"
 if [[ -z "${VPC_ID}" || "${VPC_ID}" == "None" ]]; then
@@ -46,7 +56,8 @@ if [[ -z "${S3_ENDPOINT_ID}" || "${S3_ENDPOINT_ID}" == "None" ]]; then
     --vpc-id "${VPC_ID}" \
     --vpc-endpoint-type Gateway \
     --service-name "com.amazonaws.${AWS_REGION}.s3" \
-    --route-table-ids "${ROUTE_TABLE_IDS[@]}" >/dev/null
+    --route-table-ids "${ROUTE_TABLE_IDS[@]}" \
+    --tag-specifications "${DEMO_TAG_SPEC_ENDPOINT}" >/dev/null
   echo "Created S3 VPC endpoint for ${VPC_ID}"
 else
   echo "S3 VPC endpoint exists: ${S3_ENDPOINT_ID}"
@@ -70,6 +81,7 @@ if [[ -z "${STS_ENDPOINT_ID}" || "${STS_ENDPOINT_ID}" == "None" ]]; then
       --group-name cloudbank-sts-endpoint-sg \
       --description "Allow VPC traffic to STS interface endpoint" \
       --vpc-id "${VPC_ID}" \
+      --tag-specifications "${DEMO_TAG_SPEC}" \
       --query 'GroupId' --output text)"
   fi
   aws ec2 authorize-security-group-ingress \
@@ -86,7 +98,8 @@ if [[ -z "${STS_ENDPOINT_ID}" || "${STS_ENDPOINT_ID}" == "None" ]]; then
     --service-name "com.amazonaws.${AWS_REGION}.sts" \
     --subnet-ids "${SUBNET_ARRAY[@]}" \
     --security-group-ids "${STS_ENDPOINT_SG_ID}" \
-    --private-dns-enabled >/dev/null
+    --private-dns-enabled \
+    --tag-specifications "${DEMO_TAG_SPEC_ENDPOINT}" >/dev/null
   echo "Created STS VPC interface endpoint for ${VPC_ID}"
 else
   echo "STS VPC endpoint exists: ${STS_ENDPOINT_ID}"
@@ -112,6 +125,7 @@ if [[ -z "${SG_ID}" || "${SG_ID}" == "None" ]]; then
     --group-name "${NEPTUNE_SG_NAME}" \
     --description "Neptune access for CloudBank BioBricks demo" \
     --vpc-id "${VPC_ID}" \
+    --tag-specifications "${DEMO_TAG_SPEC}" \
     --query 'GroupId' --output text --region "${AWS_REGION}")"
   echo "Created security group: ${SG_ID}"
 else
@@ -143,7 +157,7 @@ if ! aws neptune describe-db-instances --db-instance-identifier "${NEPTUNE_INSTA
     --engine neptune \
     --db-cluster-identifier "${NEPTUNE_CLUSTER_ID}" \
     --region "${AWS_REGION}" >/dev/null
-  echo "Creating Neptune instance: ${NEPTUNE_INSTANCE_ID}"
+  echo "Creating Neptune instance: ${NEPTUNE_INSTANCE_ID} (class ${NEPTUNE_INSTANCE_CLASS})"
 else
   echo "Neptune instance exists: ${NEPTUNE_INSTANCE_ID}"
 fi
@@ -155,22 +169,38 @@ if [[ -z "${LOAD_ROLE_ARN}" ]]; then
   fi
 fi
 
+# Wait until the instance is available before associating the IAM role:
+# add-role-to-db-cluster can fail silently while the cluster is still in the
+# 'creating' state, which would leave the role unassociated without an error.
+echo "Waiting for instance ${NEPTUNE_INSTANCE_ID} to become available (can take 5-15 minutes)..."
+aws neptune wait db-instance-available \
+  --db-instance-identifier "${NEPTUNE_INSTANCE_ID}" \
+  --region "${AWS_REGION}"
+echo "Instance ${NEPTUNE_INSTANCE_ID} is available."
+
 if [[ -n "${LOAD_ROLE_ARN}" ]]; then
   aws neptune add-role-to-db-cluster \
     --region "${AWS_REGION}" \
     --db-cluster-identifier "${NEPTUNE_CLUSTER_ID}" \
     --role-arn "${LOAD_ROLE_ARN}" >/dev/null 2>&1 || true
-  echo "Ensured role is associated to cluster: ${LOAD_ROLE_ARN}"
+  ASSOCIATED_ROLES="$(aws neptune describe-db-clusters \
+    --region "${AWS_REGION}" \
+    --db-cluster-identifier "${NEPTUNE_CLUSTER_ID}" \
+    --query 'DBClusters[0].AssociatedRoles' --output text)"
+  if [[ "${ASSOCIATED_ROLES}" == *"${LOAD_ROLE_ARN}"* ]]; then
+    echo "Role is associated to cluster: ${LOAD_ROLE_ARN}"
+  else
+    echo "WARNING: role ${LOAD_ROLE_ARN} is not yet associated to cluster ${NEPTUNE_CLUSTER_ID}." >&2
+    echo "Wait 1-2 minutes, then re-run:" >&2
+    echo "aws neptune add-role-to-db-cluster --db-cluster-identifier ${NEPTUNE_CLUSTER_ID} --role-arn ${LOAD_ROLE_ARN} --region ${AWS_REGION}" >&2
+    echo "The bulk load in Step 3 will fail with \"Couldn't find the aws credential for iam_role_arn\" until the role is associated." >&2
+  fi
 else
   echo "No NEPTUNE_IAM_ROLE_ARN provided/found; skipping role association."
 fi
 
-echo "Wait for availability:"
-echo "aws neptune wait db-instance-available --db-instance-identifier ${NEPTUNE_INSTANCE_ID} --region ${AWS_REGION}"
-echo "Endpoint:"
-echo "aws neptune describe-db-clusters --db-cluster-identifier ${NEPTUNE_CLUSTER_ID} --query 'DBClusters[0].Endpoint' --output text --region ${AWS_REGION}"
-
 NEPTUNE_ENDPOINT="$(aws neptune describe-db-clusters --db-cluster-identifier "${NEPTUNE_CLUSTER_ID}" --query 'DBClusters[0].Endpoint' --output text --region "${AWS_REGION}")"
+echo "Neptune endpoint: ${NEPTUNE_ENDPOINT}"
 if [[ -f .env ]] && [[ -n "${NEPTUNE_ENDPOINT}" && "${NEPTUNE_ENDPOINT}" != "None" ]]; then
   if grep -q '^NEPTUNE_ENDPOINT=' .env; then
     sed -i "s|^NEPTUNE_ENDPOINT=.*|NEPTUNE_ENDPOINT=${NEPTUNE_ENDPOINT}|" .env
