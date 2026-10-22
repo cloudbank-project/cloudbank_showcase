@@ -38,7 +38,7 @@ outputs + rendered PNG output images). This means:
 ## How fresh is this site
 
 Every page footer shows a **Last site build** badge with the date and time
-(in UTC) at which the published site was generated. Because the site is
+(in Pacific time) at which the published site was generated. Because the site is
 rebuilt by GitHub Actions on every push to `main`, that timestamp is an
 accurate indicator of how recently the tutorial pages were regenerated from
 the sources.

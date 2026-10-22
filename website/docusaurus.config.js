@@ -1,9 +1,21 @@
 // Build timestamp: captured once when the site is built so the footer can
-// show exactly when the published pages were generated (GitHub Actions runs
-// in UTC).
+// show exactly when the published pages were generated, in Pacific time
+// (America/Los_Angeles, with PDT/PST abbreviation handled by Intl so DST
+// transitions stay correct).
 const buildTime = new Date();
+const timeParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZoneName: 'short',
+}).formatToParts(buildTime);
+const part = (type) => timeParts.find((p) => p.type === type)?.value;
 const buildTimeLabel = (
-  `${buildTime.toISOString().slice(0, 16).replace('T', ' ')} UTC`
+  `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')} ${part('timeZoneName')}`
 );
 
 const config = {

@@ -85,7 +85,7 @@ Adjust both in `docusaurus.config.js` if the site is hosted elsewhere.
 ### Site freshness badge
 
 `docusaurus.config.js` captures the build time once and renders it in the
-footer as a **Last site build** badge (date and time in UTC). GitHub Actions
+footer as a **Last site build** badge (date and time in Pacific time). GitHub Actions
 rebuilds on every push to `main`, so the badge always reflects the published
 build. No manual maintenance is needed.
 
