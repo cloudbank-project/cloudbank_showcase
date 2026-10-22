@@ -118,14 +118,35 @@ http://<public-ip>:8501
 You should see:
 
 - A page titled **Chemistry Knowledge Graph Interface**
-- A text box pre-filled with a default SPARQL query
-- A **Run query** button
+- The AWS region and Neptune endpoint the app is connected to
+- A text box pre-filled with the sample SPARQL query
+- A **Run query** button and a **Restore sample query** button
 
-Click **Run query**. If results appear in a table below, everything is working.
+Click **Run query**. If results appear in a table below, everything is working. For everything the interface can do, see [Section 4](#4-what-you-can-do-in-the-interface).
 
 ---
 
-## 4) Common Queries to Try
+## 4) What You Can Do in the Interface
+
+The interface is intentionally simple: it is a browser front end for the same Neptune SPARQL endpoint you used from the command line, and the whole app is just [`web_ui/app.py`](https://github.com/cloudbank-project/cloudbank_showcase/blob/main/knowledge_graphs_chemistry/web_ui/app.py). Everything you do here is **read-only**: the app only sends SPARQL `SELECT` queries to Neptune over HTTPS and shows the results, it never modifies the graph.
+
+### Run your own queries
+
+- **Type or paste any SPARQL query** in the text box and click **Run query**. The query is posted to `https://<NEPTUNE_ENDPOINT>:8182/sparql`, signed with the AWS credentials of the container's task role, so no keys ever reach your browser.
+- **Restore sample query** puts the built-in sample query back in the text box (after you edited it) and runs it right away.
+- If the query is invalid, the app shows the error returned by Neptune instead of a result table.
+
+### What the sample query does
+
+The default query is a real research question on OREGANO: it finds compounds that have a **Wikipedia-linked name**, and for each one also returns **one extra predicate/value pair**, with `valueIsIRI` / `valueIsLiteral` flags so you can tell whether that extra value is a link to another node or plain text.
+
+### Read the results
+
+- Results appear in a **table**, and the `?s` `?p` `?o` columns are renamed to **Subject / Predicate / Object** to match the RDF triple vocabulary from [Step 3](step_03_load_and_query.md).
+- The **HTTP status** of the Neptune call is shown above the table, which helps tell a working query from a fancier-looking failure.
+- The **Raw JSON** expander shows the exact JSON Neptune returned (first 6000 characters), handy when you need the full URIs.
+
+### Common queries to try
 
 These queries work regardless of your domain expertise:
 
