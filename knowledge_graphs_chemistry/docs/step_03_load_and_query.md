@@ -17,7 +17,19 @@ Neptune is inside a private network (VPC) and cannot be reached directly from yo
 
 ## 0) Make Sure the Data Is in S3
 
-Before Neptune can load anything, the dataset file must already be in your S3 bucket. If you have not done this yet, go back and run the upload step (see Step 1 and the `scripts/01_download_oregano.sh` / `scripts/02_upload_to_s3.sh` scripts).
+Before Neptune can load anything, the dataset file must already be in your S3 bucket. If you have not done this yet, run the two helper scripts now (from the `knowledge_graphs_chemistry` folder):
+
+```bash
+# 1. Download the OREGANO dataset (creates data/oregano_sample.ttl)
+bash scripts/01_download_oregano.sh
+
+# 2. Create the S3 bucket (if it does not exist) and upload the file
+bash scripts/02_upload_to_s3.sh
+```
+
+The upload script builds the bucket name automatically from your `BUCKET_PREFIX`, account ID, and region (or uses `S3_BUCKET` if you set it in `.env`), then uploads the file to `data/oregano_sample.ttl` inside that bucket.
+
+> **Profile note:** use a profile with S3 permissions (e.g. `export AWS_PROFILE=cloudbank-demo`), and load `.env` first (`set -a && source .env && set +a`) so `AWS_REGION` and `BUCKET_PREFIX` are set.
 
 ---
 
@@ -59,18 +71,24 @@ export SUBNET_ID="${SUBNET_ID:-$(aws ec2 describe-subnets --region "$AWS_REGION"
   --query 'Subnets[0].SubnetId' --output text)}"
 
 # Create IAM role + instance profile so SSM can manage the instance
-aws iam create-role \
-  --role-name CloudbankDemoEc2Role \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
-  >/dev/null 2>&1 || true
+# (the cloudbank-demo-created tag lets the cleanup scripts recognize them)
+if ! aws iam get-role --role-name CloudbankDemoEc2Role >/dev/null 2>&1; then
+  aws iam create-role \
+    --role-name CloudbankDemoEc2Role \
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
+fi
 
 aws iam attach-role-policy --role-name CloudbankDemoEc2Role \
   --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore >/dev/null 2>&1 || true
 aws iam attach-role-policy --role-name CloudbankDemoEc2Role \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess >/dev/null 2>&1 || true
 
-aws iam create-instance-profile \
-  --instance-profile-name CloudbankDemoEc2Profile >/dev/null 2>&1 || true
+if ! aws iam get-instance-profile --instance-profile-name CloudbankDemoEc2Profile >/dev/null 2>&1; then
+  aws iam create-instance-profile \
+    --instance-profile-name CloudbankDemoEc2Profile \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
+fi
 aws iam add-role-to-instance-profile \
   --instance-profile-name CloudbankDemoEc2Profile \
   --role-name CloudbankDemoEc2Role >/dev/null 2>&1 || true
@@ -89,18 +107,32 @@ AMI_ID="$(aws ec2 describe-images --owners amazon --region "$AWS_REGION" \
   --query 'Images | sort_by(@,&CreationDate)[-1].ImageId' \
   --output text)"
 
-# Launch the instance
-RUNNER_INSTANCE_ID="$(aws ec2 run-instances \
-  --region "$AWS_REGION" \
-  --image-id "$AMI_ID" \
-  --instance-type t3.micro \
-  --iam-instance-profile Name=CloudbankDemoEc2Profile \
-  --security-group-ids "$NEPTUNE_SG_ID" \
-  --subnet-id "$SUBNET_ID" \
-  --associate-public-ip-address \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=cloudbank-neptune-runner}]' \
-  --query 'Instances[0].InstanceId' \
-  --output text)"
+# Launch the instance. Right after creating the IAM role and instance profile,
+# EC2 can reject the profile name with "Invalid IAM Instance Profile name" until
+# IAM changes propagate across AWS (usually under a minute), so retry a few times.
+RUNNER_INSTANCE_ID=""
+for attempt in 1 2 3; do
+  RUNNER_INSTANCE_ID="$(aws ec2 run-instances \
+    --region "$AWS_REGION" \
+    --image-id "$AMI_ID" \
+    --instance-type t3.micro \
+    --iam-instance-profile Name=CloudbankDemoEc2Profile \
+    --security-group-ids "$NEPTUNE_SG_ID" \
+    --subnet-id "$SUBNET_ID" \
+    --associate-public-ip-address \
+    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=cloudbank-neptune-runner}]' \
+    --query 'Instances[0].InstanceId' \
+    --output text 2>/dev/null || true)"
+  if [[ -n "$RUNNER_INSTANCE_ID" && "$RUNNER_INSTANCE_ID" != "None" ]]; then
+    echo "Runner created on attempt $attempt: $RUNNER_INSTANCE_ID"
+    break
+  fi
+  echo "Attempt $attempt to launch the runner failed (IAM propagation). Retrying in 30 s..."
+  sleep 30
+done
+if [[ -z "$RUNNER_INSTANCE_ID" || "$RUNNER_INSTANCE_ID" == "None" ]]; then
+  echo "Could not launch the runner. Wait one minute, then run this launch block again." >&2
+fi
 
 echo "RUNNER_INSTANCE_ID=$RUNNER_INSTANCE_ID"
 ```
@@ -131,6 +163,44 @@ aws ssm send-command \
 ```
 
 When SSM status shows `Online` and dependencies are installed, the runner is ready.
+
+### Recommended: check the Neptune certificate before loading
+
+Neptune serves a TLS certificate on port 8182. On rare occasions a brand-new cluster is assigned a certificate whose validity period has already ended; every TLS connection then fails with `certificate has expired` (the loader, curl, and Python clients are all affected). There is no way to rotate the certificate, so do a 10-second check before the first load.
+
+Run this on the runner (the endpoint is only reachable from inside the VPC):
+
+```bash
+export AWS_PROFILE=cloudbank-demo-admin
+set -a && source .env && set +a
+
+CERT_CMD="openssl s_client -connect ${NEPTUNE_ENDPOINT}:8182 -servername ${NEPTUNE_ENDPOINT} -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates"
+CERT_CMD_B64=$(printf '%s' "$CERT_CMD" | base64 -w0)
+
+CERT_CHECK_ID="$(aws ssm send-command \
+  --region "$AWS_REGION" \
+  --instance-ids "$RUNNER_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --parameters "commands=[\"echo $CERT_CMD_B64 | base64 -d | bash\"]" \
+  --query 'Command.CommandId' \
+  --output text)"
+
+aws ssm list-command-invocations \
+  --region "$AWS_REGION" \
+  --command-id "$CERT_CHECK_ID" \
+  --details \
+  --query 'CommandInvocations[0].CommandPlugins[0].Output' \
+  --output text
+```
+
+The output looks like:
+
+```
+notBefore=Jul 27 00:00:00 2026 GMT
+notAfter=Feb  9 23:59:59 2027 GMT
+```
+
+If `notAfter` is in the past, or the output says `certificate has expired`, stop here and follow the troubleshooting row below (delete and recreate the cluster). With a valid certificate, the load and query steps that follow work without changes.
 
 ---
 
@@ -194,11 +264,13 @@ loadId: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 **Save this `loadId`** — you will use it to check progress in the next section.
 
+A fresh load of the full OREGANO file (about 3.4 million triples) takes about 10 minutes on the `db.r5.large` instance recommended in Step 2. If the load fails within seconds, see [Section 5 Troubleshooting](#5-troubleshooting): on small instance classes the most likely cause is the database running out of memory.
+
 ---
 
 ## 3) Monitor the Load
 
-Loading millions of triples takes a few minutes. You can check progress by querying Neptune's loader status endpoint.
+Loading about 3.4 million triples takes about 10 minutes on the `db.r5.large` instance from Step 2. You can check progress by querying Neptune's loader status endpoint.
 
 First, set your load ID:
 
@@ -310,14 +382,52 @@ aws ssm list-command-invocations \
 
 | Problem | Likely cause | Fix |
 |---|---|---|
+| Load or curl fails with `certificate has expired` (`SSLCertVerificationError`, curl exit 60) | The cluster was assigned an expired TLS certificate at creation (rare) | 1. Confirm with the certificate check above. 2. Delete and recreate the cluster: run `bash scripts/10_destroy_neptune_data_and_runner.sh` (this also deletes the runner and the demo S3 bucket), then `bash scripts/07_create_neptune_cluster.sh`, then re-check the certificate. 3. If the recreated cluster still serves an expired certificate, contact AWS support or open a support case. Do not disable TLS verification to work around it. |
+| `InvalidParameterValue: Value (CloudbankDemoEc2Profile) for parameter iamInstanceProfile.name is invalid. Invalid IAM Instance Profile name` | IAM changes (role or profile) have not propagated to EC2 yet, usually right after creation | Wait about 30 seconds and run the launch block again. The launch block in Section 1 retries this automatically in 30 s intervals. |
 | Load fails with "Couldn't find the aws credential for iam_role_arn" | IAM role is not associated with the Neptune cluster, **or** the VPC is missing an STS endpoint | 1. Associate the role: `aws neptune add-role-to-db-cluster --db-cluster-identifier cloudbank-biobricks-neptune --role-arn $NEPTUNE_IAM_ROLE_ARN --region $AWS_REGION` 2. Verify an STS interface endpoint (`com.amazonaws.us-west-2.sts`) exists in the VPC with private DNS enabled |
 | Load fails with "Access Denied" to S3 | The IAM role lacks permissions or the bucket name is wrong | 1. Check `NeptuneLoadFromS3Role` has S3 read access. 2. Verify `S3_BUCKET` in `.env` is correct. |
 | SSM command returns "failed" | Runner instance is not registered with SSM yet, or missing dependencies | 1. Wait longer in the SSM polling loop. 2. Ensure `pip3 install boto3 requests` was successful on the runner. |
 | Query times out | Running from your laptop instead of the runner | Use the SSM approach above — Neptune is only reachable from inside the VPC |
 | Load status shows `LOAD_FAILED` with parse errors | Corrupted or incomplete data file | Re-download and re-upload the `.ttl` file, then retry the load |
+| Load fails within seconds with `insertErrors` and status `LOAD_UNEXPECTED_ERROR` or `LOAD_FAILED` | The database instance ran out of memory (`OUT_OF_MEMORY_ERROR` in the loader error log) | 1. Retry the load (Neptune may succeed on the next attempt). 2. If it keeps failing, delete and recreate the cluster using `db.r5.large` (see [Step 2](step_02_neptune_setup.md)) and reload. |
+| Load status shows `Out of memory error. Resume load and try again.` | The database instance lacks enough memory for the whole file; on a small class such as `db.t3.medium` (4 GiB) the full OREGANO file hits this within seconds | 1. Rerun the load: the loader resumes from where it stopped, and records already imported are skipped. 2. To confirm the cause, read the load status output from Section 3: the `errors.errorLogs` entries list an `errorCode` (here `OUT_OF_MEMORY_ERROR`) and an `errorMessage` for each failed chunk. 3. If the error keeps appearing, delete and recreate the cluster using `db.r5.large` (see [Step 2](step_02_neptune_setup.md)), which has 16 GiB and loads the full file in about 10 minutes, then reload. |
 
 ---
 
 ## Next Step
 
 If everything worked, move on to **[Step 4: Deploy a Web Interface](step_04_fargate_web_interface.md)** to give non-technical users a browser-based way to query the graph.
+
+## Cleanup (Optional)
+
+If you are done testing and want to stop the demo costs, remove the resources this tutorial created:
+
+```bash
+bash scripts/11_destroy_all_demo_resources.sh
+```
+
+`scripts/11_destroy_all_demo_resources.sh` runs the two cleanup scripts: `scripts/09_destroy_fargate_web_interface.sh` (Step 4 resources) and `scripts/10_destroy_neptune_data_and_runner.sh` (Neptune cluster and instance, EC2 runner, IAM roles, and the demo S3 bucket). Note that Neptune is deleted without a final snapshot and the S3 bucket is deleted with its contents, so only run this when you are sure you no longer need the demo data.
+
+**Teardown is asynchronous.** AWS removes most resources in the background: the Neptune cluster can keep releasing its subnet group after `describe-db-clusters` stops listing it, the ECS tasks keep draining while the cluster refuses deletion, and the VPC endpoints stay in the `deleting` state for a while. The cleanup scripts now wait and retry through this teardown (the Neptune script retries the subnet group deletion as long as the cluster reports it still in use, and it polls the VPC endpoints before deleting their security group), and they only print `cleanup complete (verified)` after re-checking every resource with `describe`. Allow several minutes on the first run.
+
+**The scripts are safe to re-run.** If a script prints a WARNING and exits non-zero (meaning teardown was still in progress), wait a few minutes and run `bash scripts/11_destroy_all_demo_resources.sh` again; the re-run completes any leftover. The scripts never delete a resource that does not carry the `cloudbank-demo-created=true` tag, so a pre-existing resource with the same name is left untouched (a `Skipping ... pre-existing` note is printed instead).
+
+**Verify before declaring clean.** After the scripts finish, these commands should all return no output:
+
+```bash
+# ECS cluster from Step 4 (an INACTIVE record is fine; AWS removes it by itself)
+aws ecs describe-clusters --region "$AWS_REGION" --clusters "${ECS_CLUSTER:-cloudbank-chemistry-ui-cluster}"
+# Neptune cluster, instance and subnet group from Steps 2-3
+aws neptune describe-db-clusters --region "$AWS_REGION"
+aws neptune describe-db-instances --region "$AWS_REGION"
+aws neptune describe-db-subnet-groups --region "$AWS_REGION"
+# Tutorial VPC endpoints (both the S3 gateway and the STS interface endpoint)
+aws ec2 describe-vpc-endpoints --region "$AWS_REGION"
+# Tutorial security groups (a pre-existing group with the same name is expected to remain)
+aws ec2 describe-security-groups --region "$AWS_REGION" --filters "Name=group-name,Values=neptune-demo-sg,cloudbank-sts-endpoint-sg"
+# EC2 runner and the demo S3 bucket
+aws ec2 describe-instances --region "$AWS_REGION" --filters "Name=tag:Name,Values=cloudbank-neptune-runner" "Name=instance-state-name,Values=pending,running,stopping,stopped,shutting-down"
+aws s3api list-buckets --region "$AWS_REGION" --query 'Buckets[?contains(Name, `cloudbank-biobricks-kg`)].Name'
+```
+
+Expected: `describe-db-clusters`, `describe-db-instances`, `describe-db-subnet-groups`, `describe-vpc-endpoints` and `describe-instances` print nothing, and the security group filter shows nothing for the two tutorial groups. The remaining checks (Step 4 load balancer, target group, ECR repository and log group) are listed in the [Step 4 cleanup section](step_04_fargate_web_interface.md#7-clean-up).

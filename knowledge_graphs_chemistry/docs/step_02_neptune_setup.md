@@ -27,16 +27,22 @@ set -a && source .env && set +a
 # 1. Create the IAM role that lets Neptune read from S3
 bash scripts/06_create_neptune_load_role.sh
 
-# 2. Create the VPC networking, Neptune cluster, and instance
+# 2. Create the VPC networking, Neptune cluster, and instance.
+#    This script waits until the instance is Available (5-15 minutes),
+#    then attaches the IAM role to the cluster and verifies the result.
 bash scripts/07_create_neptune_cluster.sh
 
-# 3. Wait until the database instance is ready (can take several minutes)
+# 3. Confirm the database instance is ready (returns immediately after step 2)
 aws neptune wait db-instance-available \
   --db-instance-identifier cloudbank-biobricks-neptune-1 \
   --region us-west-2
 ```
 
 These scripts auto-detect your default VPC and subnets, create the S3 gateway endpoint, and write `NEPTUNE_ENDPOINT` and `NEPTUNE_IAM_ROLE_ARN` into your `.env` file.
+
+The scripts create the Neptune instance with class `db.r5.large` by default (the class recommended for this dataset, see the Goal section below). If you want a cheaper smaller class anyway, override it: `NEPTUNE_INSTANCE_CLASS=db.t3.medium bash scripts/07_create_neptune_cluster.sh`.
+
+`scripts/07_create_neptune_cluster.sh` prints an explicit result for the role association: either `Role is associated to cluster` or a warning with the exact command to re-run if the role was not attached yet (this only happens rarely, when IAM propagation lags the cluster readiness).
 
 If you use the scripts, skip to [Section 7 — Verify](#7-verify-everything-is-ready) to confirm it worked.
 
@@ -49,10 +55,12 @@ By the end of this step you have:
 | Resource | Value |
 |---|---|
 | Neptune cluster | `cloudbank-biobricks-neptune` in `us-west-2` |
-| Database instance | `db.t3.medium` or `db.t4g.medium`, status = Available |
+| Database instance | `db.r5.large` (2 vCPU, 16 GiB RAM), status = Available |
 | Security group | Allows inbound TCP on port `8182` from your private network |
 | IAM role | `NeptuneLoadFromS3Role` with S3 read access |
 | `.env` updated | `NEPTUNE_ENDPOINT` and `NEPTUNE_IAM_ROLE_ARN` filled in |
+
+> **Why `db.r5.large`?** The full OREGANO file is large (about 114 MB, over 3 million triples), and a small instance class can run out of memory during the bulk load in Step 3, failing with `OUT_OF_MEMORY_ERROR` before the data is imported. `db.r5.large` (2 vCPU, 16 GiB) has 4 times the memory of `db.t3.medium` and loads the file reliably in about 10 minutes. It costs a few tens of cents per hour while it is running, and only for the hours the database exists (see the Amazon Neptune pricing page for the exact rate in your region). Smaller classes such as `db.t3.medium` or `db.t4g.medium` may still work, but they can hit out-of-memory on the full dataset.
 
 ---
 
@@ -113,10 +121,10 @@ A security group acts as a firewall. You need one that allows traffic on port **
 4. Add an **inbound rule**:
    - Type: Custom TCP
    - Port: `8182`
-   - Source: the security group of your EC2 runner (preferred) or your VPC's CIDR range.
+   - Source: your VPC's CIDR range (this is what the automated scripts in the Shortcut section create).
 5. Leave outbound rules as the default (allow all).
 
-> **Tip:** Using a security group as the "source" instead of a broad IP range is more secure. It means only machines in that specific group can reach Neptune.
+> **Tip:** In Step 3 the EC2 runner is placed in this same security group, so it can already reach Neptune on port 8182. The VPC CIDR source is fine for this demo; a security-group source is more secure if you want to limit access to specific machines.
 
 ---
 
@@ -125,7 +133,7 @@ A security group acts as a firewall. You need one that allows traffic on port **
 1. Open **Amazon Neptune** → **Databases** → **Create database**.
 2. Engine: **Neptune**.
 3. Cluster identifier: `cloudbank-biobricks-neptune`.
-4. Instance class: `db.t3.medium` (or `db.t4g.medium`) — sufficient for this demo.
+4. Instance class: `db.r5.large` (2 vCPU, 16 GiB). The smaller `db.t3.medium` and `db.t4g.medium` classes are cheaper but can run out of memory during the bulk load in Step 3, so this demo uses `db.r5.large`.
 5. DB subnet group: `neptune-demo-subnet-group`.
 6. VPC security group: `neptune-demo-sg`.
 7. IAM DB authentication: **Enable**.
@@ -146,6 +154,15 @@ Neptune does not use **your** credentials to read from S3. Instead, it **assumes
 4. Attach policy: **AmazonS3ReadOnlyAccess**.
 5. Role name: `NeptuneLoadFromS3Role`.
 6. Click **Create role** and copy the role's ARN (e.g., `arn:aws:iam::123456789012:role/NeptuneLoadFromS3Role`).
+
+Then attach the role to the cluster. Do this only after the cluster status is **Available**; adding it while the cluster is still `creating` fails silently:
+
+```bash
+aws neptune add-role-to-db-cluster \
+  --region us-west-2 \
+  --db-cluster-identifier cloudbank-biobricks-neptune \
+  --role-arn arn:aws:iam::<your-account-id>:role/NeptuneLoadFromS3Role
+```
 
 ---
 
@@ -188,6 +205,39 @@ aws iam get-role \
 
 If both return values, you are ready for Step 3.
 
+### Check the role is attached to the cluster
+
+The bulk loader uses the role only when it is attached to the cluster. The shortcut script does this automatically after the instance is Available; on the manual path you ran the attachment command in Section 5:
+
+```bash
+aws neptune describe-db-clusters \
+  --region us-west-2 \
+  --db-cluster-identifier cloudbank-biobricks-neptune \
+  --query 'DBClusters[0].AssociatedRoles' \
+  --output text
+```
+
+If this prints your role ARN, the load role is attached. If it prints nothing, run the attachment command from Section 5 again (the cluster status must be **Available**).
+
+### Check the TLS certificate is valid (pre-check)
+
+Neptune serves a TLS certificate on port 8182. On rare occasions a brand-new cluster is assigned a certificate whose validity period has already ended, and then every TLS connection fails with `certificate has expired` (the bulk loader, curl, and Python clients are all affected). There is no console option or API to rotate the certificate, so it is worth checking before the first load.
+
+The endpoint is only reachable from inside the VPC, so you run this command on the small EC2 runner that Step 3 creates, right before the bulk load (Step 3 shows how to send it to the runner):
+
+```bash
+openssl s_client -connect $NEPTUNE_ENDPOINT:8182 -servername $NEPTUNE_ENDPOINT -showcerts </dev/null 2>/dev/null | openssl x509 -noout -dates
+```
+
+The output looks like:
+
+```
+notBefore=Jul 27 00:00:00 2026 GMT
+notAfter=Feb  9 23:59:59 2027 GMT
+```
+
+If `notAfter` is in the past (or the command reports `certificate has expired`), see [Step 3 Troubleshooting](step_03_load_and_query.md): delete and recreate the cluster, or contact AWS support. With a valid certificate, the documented load and query steps work without any changes.
+
 ---
 
 ## Troubleshooting
@@ -197,4 +247,4 @@ If both return values, you are ready for Step 3.
 | `AccessDenied` when creating resources | Wrong profile | Run `export AWS_PROFILE=cloudbank-demo-admin` |
 | Neptune endpoint is empty | Cluster is still provisioning | Wait a few minutes and re-run the describe command |
 | IAM role ARN missing | Role was not created | Go back to Section 5 and create it |
-| Loader later says "can't find credential for iam_role_arn" | Role is not associated with Neptune **or** STS endpoint missing in VPC | Associate the role: `aws neptune add-role-to-db-cluster ...` and create an STS interface endpoint (`com.amazonaws.us-west-2.sts`) in the VPC |
+| Loader later says "can't find credential for iam_role_arn" | Role is not attached to Neptune **or** the STS endpoint is missing in the VPC | Attach the role while the cluster is **Available**: `aws neptune add-role-to-db-cluster ...` (verify with the check in Section 7) and create an STS interface endpoint (`com.amazonaws.us-west-2.sts`) in the VPC |

@@ -73,7 +73,7 @@ def prettify_column_names(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Chemistry Graph Interface", layout="wide")
+    st.set_page_config(page_title="Chemistry Knowledge Graph Interface", layout="wide")
     st.title("Chemistry Knowledge Graph Interface")
 
     region = os.getenv("AWS_REGION", "us-west-2")

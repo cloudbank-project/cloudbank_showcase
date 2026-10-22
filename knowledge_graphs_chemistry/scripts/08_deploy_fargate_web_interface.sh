@@ -62,7 +62,7 @@ fi
 
 UI_SG_ID="$(aws ec2 describe-security-groups --region "$AWS_REGION" --filters "Name=group-name,Values=${APP_NAME}-sg" Name=vpc-id,Values="$VPC_ID" --query 'SecurityGroups[0].GroupId' --output text)"
 if [[ -z "$UI_SG_ID" || "$UI_SG_ID" == "None" ]]; then
-  UI_SG_ID="$(aws ec2 create-security-group --region "$AWS_REGION" --group-name "${APP_NAME}-sg" --description "${APP_NAME} security group" --vpc-id "$VPC_ID" --query 'GroupId' --output text)"
+  UI_SG_ID="$(aws ec2 create-security-group --region "$AWS_REGION" --group-name "${APP_NAME}-sg" --description "${APP_NAME} security group" --vpc-id "$VPC_ID" --tag-specifications 'ResourceType=security-group,Tags=[{Key=cloudbank-demo-created,Value=true}]' --query 'GroupId' --output text)"
 fi
 
 aws ec2 authorize-security-group-ingress --region "$AWS_REGION" --group-id "$UI_SG_ID" --protocol tcp --port "$CONTAINER_PORT" --cidr 0.0.0.0/0 >/dev/null 2>&1 || true
@@ -78,14 +78,16 @@ docker push "$ECR_LATEST_URI"
 aws iam get-role --role-name ecsTaskExecutionRole >/dev/null 2>&1 || {
   aws iam create-role \
     --role-name ecsTaskExecutionRole \
-    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
   aws iam attach-role-policy --role-name ecsTaskExecutionRole --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy >/dev/null
 }
 
 aws iam get-role --role-name "$TASK_ROLE_NAME" >/dev/null 2>&1 || {
   aws iam create-role \
     --role-name "$TASK_ROLE_NAME" \
-    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
+    --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}' \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
   aws iam attach-role-policy --role-name "$TASK_ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/AdministratorAccess >/dev/null
 }
 

@@ -8,6 +8,8 @@ A **knowledge graph** solves this problem. It stores every fact as a simple link
 
 This step-by-step guide walks you through setting up a knowledge graph on **Amazon Web Services (AWS)**, from an empty account to running live queries.
 
+**Last Verified:** Oct 2026
+
 ---
 
 ## What You Will Build
@@ -103,7 +105,7 @@ A private network inside AWS. Neptune lives inside a VPC for security, which mea
 ## Getting Started
 
 ```bash
-git clone https://github.com/zonca/cloudbank_showcase.git
+git clone https://github.com/cloudbank-project/cloudbank_showcase.git
 cd cloudbank_showcase/knowledge_graphs_chemistry
 ```
 
@@ -196,8 +198,9 @@ This tutorial is part of the [BioBricks-OKG](https://insilica.co/posts/biobricks
 knowledge_graphs_chemistry/
 ├── README.md                          ← you are here
 ├── requirements.txt                   ← Python dependencies
+├── .env.example                       ← environment variables template (copy to .env)
 ├── data/
-│   └── oregano_sample.ttl             ← sample dataset (RDF/Turtle)
+│   └── oregano_sample.ttl             ← downloaded by scripts/01_download_oregano.sh (not shipped)
 ├── docs/
 │   ├── step_01_aws_auth.md            ← Step 1 guide
 │   ├── step_02_neptune_setup.md       ← Step 2 guide

@@ -51,7 +51,8 @@ if aws iam get-role --role-name "${ROLE_NAME}" >/dev/null 2>&1; then
 else
   aws iam create-role \
     --role-name "${ROLE_NAME}" \
-    --assume-role-policy-document "file://${TMP_DIR}/trust-policy.json" >/dev/null
+    --assume-role-policy-document "file://${TMP_DIR}/trust-policy.json" \
+    --tags Key=cloudbank-demo-created,Value=true >/dev/null
   echo "Created role: ${ROLE_NAME}"
 fi
 
