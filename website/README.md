@@ -1,10 +1,10 @@
-# CloudBank Showcase — Documentation Site
+# CloudBank Showcase Documentation Site
 
 This folder contains a [Docusaurus](https://docusaurus.io) site that presents
 all the showcase tutorials (markdown guides + Jupyter notebooks) as a browsable
 documentation website.
 
-The site is generated **from the tutorial sources** in the repository root —
+The site is generated **from the tutorial sources** in the repository root;
 there is no duplicate content. `npm run sync` regenerates the site content
 from the tutorial folders; never edit the generated files by hand.
 
@@ -13,7 +13,7 @@ from the tutorial folders; never edit the generated files by hand.
 - Mature, actively maintained SSG with first-class markdown support, MDX,
   code highlighting, and a built-in search-ready theme.
 - Static rendering of Jupyter notebooks is easy to add (see below) with plain
-  Node — no Python/Jupyter dependency is required to build the site.
+  Node; no Python/Jupyter dependency is required to build the site.
 - Easy GitHub Pages publishing via a standard Actions workflow
   (`.github/workflows/docs.yml`).
 
@@ -81,6 +81,13 @@ every push to `main`. The config uses:
 - `baseUrl: /cloudbank_showcase/`
 
 Adjust both in `docusaurus.config.js` if the site is hosted elsewhere.
+
+### Site freshness badge
+
+`docusaurus.config.js` captures the build time once and renders it in the
+footer as a **Last site build** badge (date and time in UTC). GitHub Actions
+rebuilds on every push to `main`, so the badge always reflects the published
+build. No manual maintenance is needed.
 
 ## Adding a tutorial
 

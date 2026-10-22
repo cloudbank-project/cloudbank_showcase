@@ -1,3 +1,11 @@
+// Build timestamp: captured once when the site is built so the footer can
+// show exactly when the published pages were generated (GitHub Actions runs
+// in UTC).
+const buildTime = new Date();
+const buildTimeLabel = (
+  `${buildTime.toISOString().slice(0, 16).replace('T', ' ')} UTC`
+);
+
 const config = {
   title: 'CloudBank Showcase',
   tagline: 'Cloud computing tutorials for real-world scientific applications',
@@ -35,8 +43,9 @@ const config = {
     navbar: {
       title: 'CloudBank Showcase',
       logo: {
-        src: 'img/favicon.svg',
-        href: '/cloudbank_showcase/',
+        src: 'img/cloudbank-logo.png',
+        alt: 'CloudBank',
+        height: 30,
       },
       items: [
         {
@@ -53,6 +62,11 @@ const config = {
     },
     footer: {
       style: 'dark',
+      logo: {
+        src: 'img/cloudbank-logo.png',
+        alt: 'CloudBank logo',
+        height: 34,
+      },
       links: [
         {
           title: 'Docs',
@@ -77,7 +91,7 @@ const config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} CloudBank Showcase. Built with Docusaurus.`,
+      copyright: `<span class="last-build">Last site build: ${buildTimeLabel}</span> · Copyright © ${new Date().getFullYear()} CloudBank Showcase. Built with Docusaurus.`,
     },
   },
 };

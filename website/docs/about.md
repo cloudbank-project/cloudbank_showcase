@@ -28,12 +28,20 @@ each tutorial's markdown guides into `website/docs/tutorials/<slug>/` and
 converts every `*.ipynb` notebook into static markdown (code cells + text
 outputs + rendered PNG output images). This means:
 
-- The tutorial guides remain the **single source of truth** — you edit them
+- The tutorial guides remain the **single source of truth**: you edit them
   in place, and the site picks up the changes on the next build.
 - Notebooks are rendered statically in the browser, with no Jupyter/Python
   requirements at build time (the converter is plain Node).
 - Relative links between guides (and images like `img/*.png`) keep working
   because original filenames are preserved.
+
+## How fresh is this site
+
+Every page footer shows a **Last site build** badge with the date and time
+(in UTC) at which the published site was generated. Because the site is
+rebuilt by GitHub Actions on every push to `main`, that timestamp is an
+accurate indicator of how recently the tutorial pages were regenerated from
+the sources.
 
 ## Build steps
 
