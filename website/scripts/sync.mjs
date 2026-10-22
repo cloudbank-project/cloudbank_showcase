@@ -46,7 +46,6 @@ const TUTORIALS = [
       { from: '3_access_jupyter_vscode.md', title: '3. Access via VS Code', position: 4 },
       { from: '4_execute_tutorial_notebook.md', title: '4. Execute the Tutorial Notebook', position: 5 },
       { from: 'ocean_gpu_tutorial.ipynb', title: 'Notebook: Ocean GPU Tutorial', position: 6 },
-      { from: 'ocean_gpu_tutorial_executed.ipynb', title: 'Notebook: Executed with Outputs', position: 7 },
     ],
   },
   {
