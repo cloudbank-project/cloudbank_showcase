@@ -14,6 +14,8 @@ Tutorials that demonstrate how to use cloud resources provided by [CloudBank](ht
 
 All tutorials are reviewed end-to-end from time to time so that they keep working on the latest cloud consoles. When a tutorial has been re-verified end-to-end, its date is updated here; fixes and improvements land in the tutorial folder itself.
 
+Tutorial verification process and lessons: see `verification/`.
+
 ### Cloud Seismology Analysis
 
 Step-by-step guides to stand up an AWS environment for seismic noise studies and run the SCEDC NoisePy workflow against S3-hosted data. Covers EC2 + Docker + Jupyter setup, S3 access configuration, and an end-to-end ambient noise cross-correlation notebook.
