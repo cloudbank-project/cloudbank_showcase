@@ -19,14 +19,16 @@ sidebar_position: 2
 3. If you add a new guide file, extend the `files` list for that tutorial in
    `website/scripts/sync.mjs`, then re-run `npm run sync`.
 
-The generated pages under `website/docs/tutorials/` are **not** committed:
-they are produced by `npm run sync`. Never edit them by hand.
+The generated pages under `website/tutorials/` are **not** committed:
+they are produced by `npm run sync`. Never edit them by hand. The same sync
+step regenerates each tutorial's sidebar (`website/sidebars/tutorial-<slug>.js`);
+those generated files are committed, but never edit them by hand either.
 
 ## Adding a new tutorial top-level
 
 If you add a top-level tutorial directory to the repository (e.g.
 `climate_analysis/`), also:
 - add an entry in `website/scripts/sync.mjs` (`TUTORIALS`),
-- add a category to `website/sidebars.js`,
+- add a link to `website/sidebars/home.js`,
 - add it to the table in `website/docs/index.md` and the repository
   `README.md`.

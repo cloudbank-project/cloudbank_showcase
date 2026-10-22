@@ -28,4 +28,4 @@ cloud_analysis_seismology/PLAN.md
 website/node_modules/
 website/build/
 website/.docusaurus/
-website/docs/tutorials/
+website/tutorials/

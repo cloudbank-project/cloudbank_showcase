@@ -24,9 +24,11 @@ notebooks:
 | Toy Data Portal for Hydrology | `toy_data_portal_hydrology/` |
 
 A small sync step (`website/scripts/sync.mjs`, run via `npm run sync`) copies
-each tutorial's markdown guides into `website/docs/tutorials/<slug>/` and
+each tutorial's markdown guides into `website/tutorials/<slug>/` and
 converts every `*.ipynb` notebook into static markdown (code cells + text
-outputs + rendered PNG output images). This means:
+outputs + rendered PNG output images). Each tutorial is its own Docusaurus
+docs instance, so the left sidebar shows only that tutorial's tree; the Home
+sidebar lists every tutorial so you can switch. This means:
 
 - The tutorial guides remain the **single source of truth**: you edit them
   in place, and the site picks up the changes on the next build.
@@ -48,7 +50,7 @@ the sources.
 ```bash
 cd website
 npm install
-npm run sync      # regenerate docs/tutorials from the tutorial sources
+npm run sync      # regenerate tutorials/ + sidebars from the tutorial sources
 npm run start     # local development server
 npm run build     # production build into website/build
 ```

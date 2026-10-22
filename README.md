@@ -44,18 +44,19 @@ The site is **generated from the tutorial sources** — the markdown guides stay
 
 ### How it works
 
-- `website/` — the Docusaurus app (config, sidebar, site pages).
+- `website/` — the Docusaurus app (config, sidebars, site pages).
 - `website/scripts/sync.mjs` (run automatically before `start`/`build`/`serve`, or manually via `npm run sync`):
-  - copies each tutorial's guides into `website/docs/tutorials/<slug>/` (original filenames kept, so relative links and `img/` assets resolve),
-  - converts every `*.ipynb` notebook to **static markdown** (code cells, text outputs, PNG outputs embedded as images) — no Python/Jupyter needed to build.
-- Generated pages under `website/docs/tutorials/` are git-ignored; never edit them by hand.
+  - copies each tutorial's guides into `website/tutorials/<slug>/` (original filenames kept, so relative links and `img/` assets resolve),
+  - converts every `*.ipynb` notebook to **static markdown** (code cells, text outputs, PNG outputs embedded as images) — no Python/Jupyter needed to build,
+  - generates one sidebar per tutorial (`website/sidebars/tutorial-<slug>.js`), so the left sidebar of a tutorial page shows only that tutorial's tree.
+- Generated pages under `website/tutorials/` are git-ignored; never edit them by hand.
 
 ### Build and run locally
 
 ```bash
 cd website
 npm install
-npm run sync     # (re)generate docs/tutorials from the tutorial sources
+npm run sync     # (re)generate tutorials/ + sidebars/ from the tutorial sources
 npm run start    # local dev server (http://localhost:3000)
 npm run build    # production build -> website/build/
 npm run serve    # serve the production build locally
@@ -69,6 +70,6 @@ npm run serve    # serve the production build locally
 
 1. Edit the guides/notebooks in their source folder.
 2. Rebuild with `cd website && npm run build` to verify.
-3. When adding a new guide, add it to the `files` list for that tutorial in `website/scripts/sync.mjs`. For a brand-new top-level tutorial, also add a category to `website/sidebars.js` and a row to `website/docs/index.md`.
+3. When adding a new guide, add it to the `files` list for that tutorial in `website/scripts/sync.mjs`. For a brand-new top-level tutorial, also add a link to `website/sidebars/home.js` and a row to `website/docs/index.md`.
 
 Full details: [website/README.md](website/README.md).
