@@ -3,6 +3,8 @@
 
 # Ignore PNG images
 *.png
+# ...except the official CloudBank logo used by the docs site
+!website/static/img/cloudbank-logo.png
 
 # Local env/config artifacts
 .env

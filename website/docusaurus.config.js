@@ -1,3 +1,23 @@
+// Build timestamp: captured once when the site is built so the footer can
+// show exactly when the published pages were generated, in Pacific time
+// (America/Los_Angeles, with PDT/PST abbreviation handled by Intl so DST
+// transitions stay correct).
+const buildTime = new Date();
+const timeParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZoneName: 'short',
+}).formatToParts(buildTime);
+const part = (type) => timeParts.find((p) => p.type === type)?.value;
+const buildTimeLabel = (
+  `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')} ${part('timeZoneName')}`
+);
+
 const config = {
   title: 'CloudBank Showcase',
   tagline: 'Cloud computing tutorials for real-world scientific applications',
@@ -35,8 +55,9 @@ const config = {
     navbar: {
       title: 'CloudBank Showcase',
       logo: {
-        src: 'img/favicon.svg',
-        href: '/cloudbank_showcase/',
+        src: 'img/cloudbank-logo.png',
+        alt: 'CloudBank',
+        height: 30,
       },
       items: [
         {
@@ -53,6 +74,11 @@ const config = {
     },
     footer: {
       style: 'dark',
+      logo: {
+        src: 'img/cloudbank-logo.png',
+        alt: 'CloudBank logo',
+        height: 34,
+      },
       links: [
         {
           title: 'Docs',
@@ -77,7 +103,7 @@ const config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} CloudBank Showcase. Built with Docusaurus.`,
+      copyright: `<span class="last-build">Last site build: ${buildTimeLabel}</span> · Copyright © ${new Date().getFullYear()} CloudBank Showcase. Built with Docusaurus.`,
     },
   },
 };
