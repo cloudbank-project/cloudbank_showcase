@@ -74,7 +74,7 @@ Notes:
 Dummy authentication is only for this tutorial; change it before exposing to real users. The password generated above is available in `JHUB_PASS` for the session. Note that JupyterHub 5.3+ deprecates `DummyAuthenticator.password` in favor of `SharedPasswordAuthenticator`; it still works on the current chart (which bundles JupyterHub 5.5.4) and is the simplest option for this demo.
 All settings above are validated against the current chart (v4.4.4 as of Oct 2026); if a future chart version rejects a key, check the chart’s `values.yaml` for the replacement.
 
-3) Install or upgrade the release (this pulls the latest chart):
+3) Install or upgrade the release (this pulls the latest chart; the config above was validated against chart 4.4.4 / app version 5.5.4 with helm v4.3 in Cloud Shell):
 ```bash
 helm upgrade --install jhub jupyterhub/jupyterhub \
   --namespace jhub \
@@ -90,10 +90,10 @@ kubectl -n jhub get pods -w
    ```bash
    kubectl -n jhub get svc proxy-public
    ```
-   Sample output once the IP is assigned (your cluster IP, external IP and node port will differ):
+   Sample output once the IP is assigned (your cluster IP, external IP, node port and age will differ; the values below are from the live walkthrough of this tutorial):
    ```
    NAME           TYPE           CLUSTER-IP    EXTERNAL-IP    PORT(S)        AGE
-   proxy-public   LoadBalancer   10.0.32.123   34.82.10.20    80:30590/TCP   2m
+   proxy-public   LoadBalancer   10.0.32.123   8.229.165.77   80:30614/TCP   2m
    ```
 2) Enable HTTPS with a self-signed cert. This encrypts traffic and makes authentication safer; browsers will warn about the certificate because it’s self-signed.
 ```bash
